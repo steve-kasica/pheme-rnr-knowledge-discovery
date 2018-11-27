@@ -1,2 +1,7 @@
-pheme-rnr-dataset
+
+# Ignore fines in the raw except the README file
+raw/**/*
+!raw/README.md
+
+# Ignore Python or Jupyter things
 .ipynb_checkpoints

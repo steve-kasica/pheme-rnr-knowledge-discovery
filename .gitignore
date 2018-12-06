@@ -5,3 +5,4 @@ raw/**/*
 
 # Ignore Python or Jupyter things
 .ipynb_checkpoints
+__pycache__

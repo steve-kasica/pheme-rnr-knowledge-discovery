@@ -17,8 +17,8 @@ def pheme_to_csv(event):
     Return: None
     """
     start = time.time()
-    dataset = "raw/pheme-rnr-dataset"
-    fn = "data/pheme-rnr-dataset/%s.csv" % (event)
+    dataset = "../raw/pheme-rnr-dataset"
+    fn = "../data/pheme-rnr-dataset/%s.csv" % (event)
     header = True
     data = pd.DataFrame()   
     thread_number=0         
@@ -57,7 +57,7 @@ def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
         "id": twt.get("id"),
         "in_reply_id": twt.get("in_reply_to_status_id", None),
         "in_reply_user": twt.get("in_reply_to_user", None),
-        "is_rumor": True if cat is "rumour" else False,
+        "is_rumor": True if cat is "rumours" else False,
         "is_source_tweet" : is_source_tweet,
         "has_url": True if len(twt["entities"]["urls"]) > 0 else False,
         "symbols_count": len(twt["entities"]["symbols"]),

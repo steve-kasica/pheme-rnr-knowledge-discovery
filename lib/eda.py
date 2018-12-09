@@ -13,7 +13,7 @@ def get_event_data(event, dataset="pheme-rnr-dataset", refresh=False):
     
     Return: Pandas DataFrame
     """
-    fn = "data/%s/%s.csv" % (dataset, event)  
+    fn = "../data/%s/%s.csv" % (dataset, event)  
     if refresh:
         clean_pheme_by_event(event)
         event = pd.read_csv(fn)
@@ -33,20 +33,21 @@ def clean_pheme_by_event(event):
     
     Return: None
     """
-    dataset = "raw/pheme-rnr-dataset"
-    fn = "data/pheme-rnr-dataset/%s.csv" % (event)
+    dataset = "../raw/pheme-rnr-dataset"
+    fn = "../data/pheme-rnr-dataset/%s.csv" % (event)
     header = True
     data = pd.DataFrame()   
     thread_number=0         
     for category in os.listdir("%s/%s" % (dataset, event)):
+        print('category:',category,category=='rumours')
         for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
             with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
                 tweet = json.load(f)
             df = tweet_to_df(tweet, category, thread)
             data = data.append(df)
             thread_number+=1
-            #if thread_number>10:
-            #    break;
+            if thread_number>10:
+                break;
             print('thread:',thread_number)
             for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
                 with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
@@ -56,7 +57,7 @@ def clean_pheme_by_event(event):
     data.to_csv(fn, index=False)
     return None
 
-def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
+def tweet_to_df(twt, cat, thrd, is_source_tweet=True):
     """  Convert tweet meta-data to DataFrame instance
     
     Params:
@@ -79,7 +80,7 @@ def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
         "user.tweets_count": twt["user"]["statuses_count"],
         "user.followers_count": twt["user"]["followers_count"],
         "has_url": True if len(twt["entities"]["urls"]) > 0 else False,
-        "is_rumor": True if cat is "rumour" else False,
+        "is_rumor": True if cat == 'rumours' else False,
         "retweet_count": twt.get("retweet_count"),
         "symbols_count": len(twt["entities"]["symbols"]),
         "mentions_count": len(twt["entities"]["user_mentions"]),
@@ -91,5 +92,5 @@ def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
         "is_source_tweet" : is_source_tweet
     }])
 
-charliehebdo = get_event_data("ferguson", refresh=True)
+charliehebdo = get_event_data("ottawashooting", refresh=True)
 charliehebdo.head()

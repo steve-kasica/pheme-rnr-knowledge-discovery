@@ -46,8 +46,8 @@ def clean_pheme_by_event(event):
             df = tweet_to_df(tweet, category, thread)
             data = data.append(df)
             thread_number+=1
-            if thread_number>10:
-                break;
+            #if thread_number>10:
+            #    break;
             print('thread:',thread_number)
             for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
                 with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:

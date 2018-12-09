@@ -1,14 +1,31 @@
-"""
-    @name :pheme_parsing.py
-    @description: A Python 3 module for parsing raw data from the PHEME rumor non-rumor dataset and saving it in tabular form
-    @author: Steve Kasica <kasica@alumni.cs.ubc.ca>
-"""
-
-import os, json, errno, time
+# Load dependencies for this Jupyter Notebook
+import os, json, errno
 import pandas as pd
-import numpy as np
+from pandas.io.json import json_normalize
 
-def pheme_to_csv(event):
+def get_event_data(event, dataset="pheme-rnr-dataset", refresh=False):
+    """ Fetches event data as a Pandas DataFrame. If cleaned CSV file does not exist, then create it.
+    
+    Params:
+        - event: Name of fake news event
+        - dataset: fake news dataset, default to PHEME dataset
+        - refresh: if True, then reparse raw PHEME to CSV and overwrite existing CSV file.
+    
+    Return: Pandas DataFrame
+    """
+    fn = "../data/%s/%s.csv" % (dataset, event)  
+    if refresh:
+        clean_pheme_by_event(event)
+        event = pd.read_csv(fn)
+    else:
+        try:
+            event = pd.read_csv(fn)
+        except OSError as e:
+            clean_pheme_by_event(event)
+            event = pd.read_csv(fn)
+    return event;
+
+def clean_pheme_by_event(event):
     """ Parses json data stored in directories of the PHEME dataset into a CSV file.
     
     Params:
@@ -16,29 +33,31 @@ def pheme_to_csv(event):
     
     Return: None
     """
-    start = time.time()
     dataset = "../raw/pheme-rnr-dataset"
     fn = "../data/pheme-rnr-dataset/%s.csv" % (event)
     header = True
     data = pd.DataFrame()   
     thread_number=0         
     for category in os.listdir("%s/%s" % (dataset, event)):
+        print('category:',category,category=='rumours')
         for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
             with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
                 tweet = json.load(f)
             df = tweet_to_df(tweet, category, thread)
             data = data.append(df)
             thread_number+=1
+            #if thread_number>10:
+            #    break;
+            print('thread:',thread_number)
             for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
                 with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
                     tweet = json.load(f)
                 df = tweet_to_df(tweet, category, thread,False)
                 data = data.append(df)
     data.to_csv(fn, index=False)
-    print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
     return None
 
-def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
+def tweet_to_df(twt, cat, thrd, is_source_tweet=True):
     """  Convert tweet meta-data to DataFrame instance
     
     Params:
@@ -49,7 +68,6 @@ def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
     """
     
     return pd.DataFrame([{
-        
         # Tweet data
         "thread": thrd,        
         "tweet_length": len(twt.get("text","")),
@@ -93,32 +111,5 @@ def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
         "user.time_zone": twt["user"]["time_zone"]
     }])
 
-def agg_event_data(df, limit=0):
-    """ Aggregate tabular tweet data from a PHEME event into aggregated thread-level data
-    
-    Params:
-        - df: the DataFrame with tabular tweet data
-       
-    Return: A DataFrame with thread-level data for this event
-    """
-    data = df.head(limit) if limit > 0 else df
-    data = data.replace({"has_url": {"True": True, "False": False}})
-    agg = data.groupby("thread") \
-        .agg({"favorite_count": sum,
-              "retweet_count": sum,
-              "is_rumor": max,
-              "has_url": lambda col: np.count_nonzero(col) / len(col),
-              "id": len,
-              "hashtags_count": lambda col: len([True for total in col if total > 0]) / len(col),
-              "text": lambda col: len([True for txt in col if "😊" in txt]) / len(col)}) \
-        .rename(columns={"favorite_count": "favorite_total",
-                         "retweet_count": "retweet_total",
-                         "user.friends_count": "friends_total",
-                         "id": "thread_length",
-                         "has_url":"url_proportion",
-                         "hashtags_count": "hashtag_proportion",
-                         "text": "smile_emoji_proportion"})
-    src = data[data["thread"] == data["id"]][["thread", "user.followers_count"]]  # source tweets will have equal thread id and tweet id
-    src = src.rename(columns={"user.followers_count": "src_followers_count"})
-    thrd_data = pd.merge(agg, src, on="thread")
-    return thrd_data
+charliehebdo = get_event_data("ottawashooting", refresh=True)
+charliehebdo.head()

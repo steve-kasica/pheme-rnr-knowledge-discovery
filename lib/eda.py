@@ -66,30 +66,49 @@ def tweet_to_df(twt, cat, thrd, is_source_tweet=True):
         - thrd: The thread id of the tweet
         - is_source_tweet : True if it's a source tweet and false if it is a reaction
     """
-    
+
     return pd.DataFrame([{
-        "thread": thrd,
+        # Tweet data
+        "thread": thrd,        
         "tweet_length": len(twt.get("text","")),
         "text": twt.get("text"),
         "id": twt.get("id"),
         "in_reply_id": twt.get("in_reply_to_status_id", None),
         "in_reply_user": twt.get("in_reply_to_user", None),
-        "favorite_count": twt.get("favorite_count"),
-        "retweeted": twt.get("retweeted"),
-        "coordinates": twt.get("coordinates"),
-        "user.tweets_count": twt["user"]["statuses_count"],
-        "user.followers_count": twt["user"]["followers_count"],
+        "is_rumor": True if cat == "rumours" else False,
+        "is_source_tweet" : is_source_tweet,
         "has_url": True if len(twt["entities"]["urls"]) > 0 else False,
-        "is_rumor": True if cat == 'rumours' else False,
-        "retweet_count": twt.get("retweet_count"),
         "symbols_count": len(twt["entities"]["symbols"]),
-        "mentions_count": len(twt["entities"]["user_mentions"]),
         "hashtags_count": len(twt["entities"]["hashtags"]),                                          
         "urls_count": len(twt["entities"]["urls"]),
-        "user.friends_count": twt["user"]["friends_count"],
         "created": twt.get("created_at"),
         "lang": twt.get("lang"),
-        "is_source_tweet" : is_source_tweet
+        "is_truncated": twt.get("truncated", False),
+        
+        # Interaction meta-data
+        "favorite_count": twt.get("favorite_count"),
+        "retweeted": twt.get("retweeted"),
+        "retweet_count": twt.get("retweet_count", 0),
+        "mentions_count": len(twt["entities"]["user_mentions"]),        
+        
+        # Geolocation meta-data
+        "coordinates": twt.get("coordinates"),
+        
+        # user meta-data
+        "user.tweets_count": twt["user"]["statuses_count"],
+        "user.followers_count": twt["user"]["followers_count"],
+        "user.listed_count": twt["user"]["listed_count"],
+        "user.friends_count": twt["user"]["friends_count"],
+        "user.location": twt["user"]["location"],
+        "user.geo_enabled": twt["user"]["geo_enabled"],
+        "user.description": twt["user"]["description"],
+        "user.created_at": twt["user"]["created_at"],
+        "user.default_profile": twt["user"]["default_profile"],
+        "user.utf_offset": twt["user"]["utc_offset"],
+        "user.profile_users_background_image": twt["user"]["profile_use_background_image"],
+        "user.verified": twt["user"]["verified"],
+        "user.contributors_enabled": twt["user"]["contributors_enabled"],
+        "user.time_zone": twt["user"]["time_zone"]
     }])
 
 charliehebdo = get_event_data("ottawashooting", refresh=True)

@@ -58,7 +58,7 @@ class Tweets:
 
         features = {
             # Thread metadata
-            "is_rumor": lambda obj : 1 if obj['category'] == "rumors" else 0,
+            "is_rumor": lambda obj : 1 if obj['category'] == "rumours" else 0,
             
             # Conservation metadata
             "thread" : lambda obj : obj["thread"],

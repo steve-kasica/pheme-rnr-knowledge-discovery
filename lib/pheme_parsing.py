@@ -7,6 +7,7 @@
 import os, json, errno, time
 import pandas as pd
 import numpy as np
+from sys import argv
 
 def pheme_to_csv(event):
     """ Parses json data stored in directories of the PHEME dataset into a CSV file.
@@ -17,81 +18,97 @@ def pheme_to_csv(event):
     Return: None
     """
     start = time.time()
+    data = Tweets(event)
     dataset = "raw/pheme-rnr-dataset"
-    fn = "data/pheme-rnr-dataset/%s.csv" % (event)
-    header = True
-    data = pd.DataFrame()   
-    thread_number=0         
+    thread_number = 0         
     for category in os.listdir("%s/%s" % (dataset, event)):
         for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
             with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
                 tweet = json.load(f)
-            df = tweet_to_df(tweet, category, thread)
-            data = data.append(df)
-            thread_number+=1
+            data.append(tweet, category, thread, True)
+            thread_number += 1
             for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
                 with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
                     tweet = json.load(f)
-                df = tweet_to_df(tweet, category, thread,False)
-                data = data.append(df)
-    data.to_csv(fn, index=False)
+                data.append(tweet, category, thread, False)
+    data.export()
+    fn = "data/tweets/%s.csv" % (event)
     print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
     return None
 
-def tweet_to_df(twt, cat, thrd, is_source_tweet=False):
-    """  Convert tweet meta-data to DataFrame instance
+class Tweets:
+
+    def __init__(self, event_name):
+        self.event = event_name
+        self.data = {}
     
-    Params:
-        - twt: The new tweet to add to the table
-        - cat: The category of the tweet, either rumor or non rumor
-        - thrd: The thread id of the tweet
-        - is_source_tweet : True if it's a source tweet and false if it is a reaction
-    """
-    
-    return pd.DataFrame([{
+    def append(self, twt, cat, thrd, is_src):
+        """ Convert tweet metadata into features.
+
+        Key to the `self.data` dictionary defined in this function define columns in
+        the CSV file produced by the `export` method.
+
+        Params:
+            - twt: The new tweet to add to the table
+            - cat: The category of the tweet, e.g. rumour
+            - thrd: The thread id of the tweet
+            - is_src : True if it's a source tweet and false if it is a reaction
+        """
+        twt['category'] = cat
+        twt["thread"] = thrd
+        twt["event"] = self.event
+        twt["is_src"] = is_src
+
+        features = {
+            # Thread metadata
+            "is_rumor": lambda obj : 1 if obj['category'] == "rumors" else 0,
+            
+            # Conservation metadata
+            "thread" : lambda obj : obj["thread"],
+            "in_reply_tweet" : lambda obj : obj.get("in_reply_to_status_id"),
+            "event" : lambda obj : obj.get("event"),
+            "tweet_id" : lambda obj : obj.get("id"),
+            "is_source_tweet" : lambda obj : 1 if twt["is_src"] else 0,
+            "in_reply_user" : lambda obj : obj.get("in_reply_to_user_id"),
+            "user_id" : lambda obj : obj["user"].get("id"),
+            
+            # Tweet metadata
+            "tweet_length": lambda obj : len(obj.get("text","")),
+            "urls_count": lambda obj : len(obj["entities"].get("urls", [])),
+            "hashtags_count": lambda obj : len(obj["entities"].get("hashtags", [])),
+            "retweet_count": lambda obj : obj.get("retweet_count", 0),
+            "favorite_count": lambda obj : obj.get("favorite_count"),
+            "mentions_count": lambda obj : len(obj["entities"].get("user_mentions", "")),
+            "is_truncated": lambda obj : 1 if obj.get("truncated") else 0,
+            "created": lambda obj : obj.get("created_at"),
+            "has_smile_emoji": lambda obj: 1 if "😊" in obj["text"] else 0,
+
+            # User metadata
+            "user.tweets_count": lambda obj: obj["user"].get("statuses_count", 0),
+            "user.verified": lambda obj: 1 if obj["user"].get("verified") else 0,
+            "user.followers_count": lambda obj: obj["user"].get("followers_count"),
+            "user.listed_count": lambda obj: obj["user"].get("listed_count"),
+            "user.friends_count": lambda obj: obj["user"].get("friends_count"),
+            "user.time_zone": lambda obj: obj["user"].get("time_zone"),
+            "user.desc_length": lambda obj: len(obj["user"]["description"]) if obj["user"]["description"] else 0,
+            "user.has_bg_img": lambda obj: 1 if obj["user"].get("profile_use_background_image") else 0,
+            "user.default_pic": lambda obj: 1 if obj["user"].get("default_profile") else 0,
+            "user.created_at": lambda obj: obj["user"].get("created_at"),
         
-        # Tweet data
-        "thread": thrd,        
-        "tweet_length": len(twt.get("text","")),
-        "text": twt.get("text"),
-        "id": twt.get("id"),
-        "in_reply_id": twt.get("in_reply_to_status_id", None),
-        "in_reply_user": twt.get("in_reply_to_user", None),
-        "is_rumor": True if cat is "rumour" else False,
-        "is_source_tweet" : is_source_tweet,
-        "has_url": True if len(twt["entities"]["urls"]) > 0 else False,
-        "symbols_count": len(twt["entities"]["symbols"]),
-        "hashtags_count": len(twt["entities"]["hashtags"]),                                          
-        "urls_count": len(twt["entities"]["urls"]),
-        "created": twt.get("created_at"),
-        "lang": twt.get("lang"),
-        "is_truncated": twt.get("truncated", False),
-        
-        # Interaction meta-data
-        "favorite_count": twt.get("favorite_count"),
-        "retweeted": twt.get("retweeted"),
-        "retweet_count": twt.get("retweet_count", 0),
-        "mentions_count": len(twt["entities"]["user_mentions"]),        
-        
-        # Geolocation meta-data
-        "coordinates": twt.get("coordinates"),
-        
-        # user meta-data
-        "user.tweets_count": twt["user"]["statuses_count"],
-        "user.followers_count": twt["user"]["followers_count"],
-        "user.listed_count": twt["user"]["listed_count"],
-        "user.friends_count": twt["user"]["friends_count"],
-        "user.location": twt["user"]["location"],
-        "user.geo_enabled": twt["user"]["geo_enabled"],
-        "user.description": twt["user"]["description"],
-        "user.created_at": twt["user"]["created_at"],
-        "user.default_profile": twt["user"]["default_profile"],
-        "user.utf_offset": twt["user"]["utc_offset"],
-        "user.profile_users_background_image": twt["user"]["profile_use_background_image"],
-        "user.verified": twt["user"]["verified"],
-        "user.contributors_enabled": twt["user"]["contributors_enabled"],
-        "user.time_zone": twt["user"]["time_zone"]
-    }])
+        # Other future features
+        # "user.location": twt["user"]["location"],
+        # "user.geo_enabled": twt["user"]["geo_enabled"],
+        # "user.utf_offset": twt["user"]["utc_offset"],
+        # "user.contributors_enabled": twt["user"]["contributors_enabled"],
+        }
+
+        for col in features:
+            self.data.setdefault(col, []).append(features[col](twt))
+
+    def export(self):
+        fn = "data/tweets/%s.csv" % (self.event)
+        df = pd.DataFrame(data=self.data)
+        df.to_csv(fn, index=False)
 
 def agg_event_data(df, limit=0):
     """ Aggregate tabular tweet data from a PHEME event into aggregated thread-level data
@@ -122,3 +139,7 @@ def agg_event_data(df, limit=0):
     src = src.rename(columns={"user.followers_count": "src_followers_count"})
     thrd_data = pd.merge(agg, src, on="thread")
     return thrd_data
+
+if __name__ == "__main__":
+    print("Running %s to parse %s" % (argv[0], argv[1]))
+    pheme_to_csv(argv[1])

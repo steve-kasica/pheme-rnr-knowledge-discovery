@@ -1,0 +1,1461 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Parsing and Cleaning PHEME RNR Dataset Events\n",
+    "\n",
+    "This notebook performs data-cleaning and aggrigation into thread-level data. It also provides a useful sanity check. Run all the cells in this notebook to generate thread-level CSV files in the `data/threads` directory."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load dependencies for this Jupyter Notebook\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import time\n",
+    "from functools import reduce\n",
+    "from lib.util import fetch_tweets, to_unix_tmsp"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 86,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# Load dependencies for this Jupyter Notebook\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "from functools import reduce\n",
+    "from sklearn.decomposition import PCA,SparsePCA,KernelPCA\n",
+    "from sklearn.manifold import TSNE, Isomap\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "#Train and Test preprocessing\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn import preprocessing\n",
+    "\n",
+    "#Classifiers:\n",
+    "from sklearn import svm\n",
+    "from sklearn.tree import DecisionTreeClassifier\n",
+    "from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier\n",
+    "from sklearn.neighbors import KNeighborsClassifier\n",
+    "from sklearn.gaussian_process import GaussianProcessClassifier\n",
+    "from sklearn.gaussian_process import GaussianProcessClassifier\n",
+    "from sklearn.gaussian_process.kernels import RBF"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Parsing and Cleaning Data\n",
+    "This step takes the raw PHEME rumor dataset and saves it tabular format as CSV file. The original PHEME dataset consists of JSON files organized into directories by event and category (rumor or non-rumor). These three functions below parse the data, save it as a CSV file (if necessary), and load it into this notebook as a Pandas DataFrame from the \"cached\" CSV file."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "gw = fetch_tweets(\"germanwings-crash\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "##  Tweet Level Features\n",
+    "\n",
+    "| Name/Column       | Description                   | Type   | Notes  |\n",
+    "|-------------------|-------------------------------|--------| ------ |\n",
+    "| is_rumor          | Was this classified as rumor  | `bool` | *Classification done by journalists* |\n",
+    "| thread            | Source tweet id               | `str`  |                                                   |\n",
+    "| in_reply_tweet    | Tweet ID in reply to          | `str`  |                                                   |\n",
+    "| event             | Name of the PHEME event       | `str`  | Corresponds to event in the PHEME dataset         |\n",
+    "| tweet_id          | Unique ID for tweet           | `str`  | This field is the ID referenced in `in_reply_tweet`     |\n",
+    "| is_source_tweet   | Was this classified as rumor  | `bool` |                                                   |\n",
+    "| in_reply_user     | User ID in reply to           | `str`  |                                                   |\n",
+    "| user_id           | Twitter User's ID             | `str`  | This field is the ID referenced in `in_reply_user` |\n",
+    "| tweet_length      | Number of characters in tweet | `int`  |                                                   |\n",
+    "| urls_count        | Number of URLS in tweet       | `int`  |                                                   |\n",
+    "| hashtags_count    | Number of hashtags in tweet   | `int`  |                                                   |\n",
+    "| retweet_count     | Times the tweet was retweeted | `int`  |                                                   |\n",
+    "| favorite_count    | Number of times favorited     | `int`  |                                                   |\n",
+    "| mentions_count    | Number of users mentioned     | `int`  |                                                   |\n",
+    "| is_truncated      | Is this tweet truncated       | `bool` | Did User type > 140 characters. [See Tweet updates](https://developer.twitter.com/en/docs/tweets/tweet-updates) |\n",
+    "| created              | Datetime Tweet was created    | `datetime` | |\n",
+    "| has_smile_emoji      | Does Tweet contain \"\"?        | `bool` | 😊 is the smile emoji |\n",
+    "| user.tweets_count    | User's tweet total, currently | `int`  | |\n",
+    "| user.verified        | Is Twitter user verified?     | `bool` |                                                   |\n",
+    "| user.followers_count | Total number of followers  | `int` | |\n",
+    "| user.listed_count    | ?? | `int` | | \n",
+    "| user.friends_count   | ?? | `int` | |\n",
+    "| user.time_zone       | Timezone of the user's Twitter account | `str` | |\n",
+    "| user.desc_length     | Length of the user's biographic description | `int` |\n",
+    "| user.has_bg_img      | Does user have a profile background image?  | `bool` |\n",
+    "| user.default_pric    | Does the user have the default profile picture | `bool` |\n",
+    "| user.created_at      | Date and time Twitter account was activated | `datetime` | |"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Germanwings Crash"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "<class 'pandas.core.frame.DataFrame'>\n",
+      "RangeIndex: 4489 entries, 0 to 4488\n",
+      "Data columns (total 27 columns):\n",
+      "is_rumor                4489 non-null bool\n",
+      "thread                  4489 non-null object\n",
+      "in_reply_tweet          4489 non-null object\n",
+      "event                   4489 non-null object\n",
+      "tweet_id                4489 non-null object\n",
+      "is_source_tweet         4489 non-null bool\n",
+      "in_reply_user           4489 non-null object\n",
+      "user_id                 4489 non-null object\n",
+      "tweet_length            4489 non-null int64\n",
+      "urls_count              4489 non-null int64\n",
+      "hashtags_count          4489 non-null int64\n",
+      "retweet_count           4489 non-null int64\n",
+      "favorite_count          4489 non-null int64\n",
+      "mentions_count          4489 non-null int64\n",
+      "is_truncated            4489 non-null bool\n",
+      "created                 4489 non-null datetime64[ns, UTC]\n",
+      "has_smile_emoji         4489 non-null bool\n",
+      "user.tweets_count       4489 non-null int64\n",
+      "user.verified           4489 non-null bool\n",
+      "user.followers_count    4489 non-null int64\n",
+      "user.listed_count       4489 non-null int64\n",
+      "user.friends_count      4489 non-null int64\n",
+      "user.time_zone          3079 non-null object\n",
+      "user.desc_length        4489 non-null int64\n",
+      "user.has_bg_img         4489 non-null bool\n",
+      "user.default_pic        4489 non-null bool\n",
+      "user.created_at         4489 non-null datetime64[ns, UTC]\n",
+      "dtypes: bool(7), datetime64[ns, UTC](2), int64(11), object(7)\n",
+      "memory usage: 732.2+ KB\n"
+     ]
+    }
+   ],
+   "source": [
+    "gw.info()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The `.head` method prints out the 5 first rows in the dataframe"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>is_rumor</th>\n",
+       "      <th>thread</th>\n",
+       "      <th>in_reply_tweet</th>\n",
+       "      <th>event</th>\n",
+       "      <th>tweet_id</th>\n",
+       "      <th>is_source_tweet</th>\n",
+       "      <th>in_reply_user</th>\n",
+       "      <th>user_id</th>\n",
+       "      <th>tweet_length</th>\n",
+       "      <th>urls_count</th>\n",
+       "      <th>...</th>\n",
+       "      <th>user.tweets_count</th>\n",
+       "      <th>user.verified</th>\n",
+       "      <th>user.followers_count</th>\n",
+       "      <th>user.listed_count</th>\n",
+       "      <th>user.friends_count</th>\n",
+       "      <th>user.time_zone</th>\n",
+       "      <th>user.desc_length</th>\n",
+       "      <th>user.has_bg_img</th>\n",
+       "      <th>user.default_pic</th>\n",
+       "      <th>user.created_at</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>False</td>\n",
+       "      <td>580319983676313601</td>\n",
+       "      <td>nan</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>580319983676313601</td>\n",
+       "      <td>True</td>\n",
+       "      <td>nan</td>\n",
+       "      <td>8330472</td>\n",
+       "      <td>98</td>\n",
+       "      <td>1</td>\n",
+       "      <td>...</td>\n",
+       "      <td>107042</td>\n",
+       "      <td>True</td>\n",
+       "      <td>179430</td>\n",
+       "      <td>3550</td>\n",
+       "      <td>74</td>\n",
+       "      <td>Madrid</td>\n",
+       "      <td>115</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2007-08-21 14:03:19+00:00</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>False</td>\n",
+       "      <td>580319983676313601</td>\n",
+       "      <td>5.803199836763136e+17</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>580322851850461184</td>\n",
+       "      <td>False</td>\n",
+       "      <td>8330472.0</td>\n",
+       "      <td>2307392966</td>\n",
+       "      <td>109</td>\n",
+       "      <td>1</td>\n",
+       "      <td>...</td>\n",
+       "      <td>2076</td>\n",
+       "      <td>False</td>\n",
+       "      <td>988</td>\n",
+       "      <td>7</td>\n",
+       "      <td>1782</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>121</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>2014-01-23 23:26:57+00:00</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>False</td>\n",
+       "      <td>580319983676313601</td>\n",
+       "      <td>5.803228518504612e+17</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>580323127089082368</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2307392966.0</td>\n",
+       "      <td>2535310842</td>\n",
+       "      <td>36</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>701</td>\n",
+       "      <td>False</td>\n",
+       "      <td>62</td>\n",
+       "      <td>1</td>\n",
+       "      <td>121</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>34</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2014-05-30 15:39:18+00:00</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>False</td>\n",
+       "      <td>580319983676313601</td>\n",
+       "      <td>5.803231270890824e+17</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>580325737619685377</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2535310842.0</td>\n",
+       "      <td>2535310842</td>\n",
+       "      <td>72</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>701</td>\n",
+       "      <td>False</td>\n",
+       "      <td>62</td>\n",
+       "      <td>1</td>\n",
+       "      <td>121</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>34</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2014-05-30 15:39:18+00:00</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>False</td>\n",
+       "      <td>580321203757387776</td>\n",
+       "      <td>nan</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>580321203757387776</td>\n",
+       "      <td>True</td>\n",
+       "      <td>nan</td>\n",
+       "      <td>92771309</td>\n",
+       "      <td>85</td>\n",
+       "      <td>1</td>\n",
+       "      <td>...</td>\n",
+       "      <td>11447</td>\n",
+       "      <td>True</td>\n",
+       "      <td>20839</td>\n",
+       "      <td>369</td>\n",
+       "      <td>1354</td>\n",
+       "      <td>London</td>\n",
+       "      <td>108</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2009-11-26 15:08:39+00:00</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>5 rows × 27 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   is_rumor              thread         in_reply_tweet              event  \\\n",
+       "0     False  580319983676313601                    nan  germanwings-crash   \n",
+       "1     False  580319983676313601  5.803199836763136e+17  germanwings-crash   \n",
+       "2     False  580319983676313601  5.803228518504612e+17  germanwings-crash   \n",
+       "3     False  580319983676313601  5.803231270890824e+17  germanwings-crash   \n",
+       "4     False  580321203757387776                    nan  germanwings-crash   \n",
+       "\n",
+       "             tweet_id  is_source_tweet in_reply_user     user_id  \\\n",
+       "0  580319983676313601             True           nan     8330472   \n",
+       "1  580322851850461184            False     8330472.0  2307392966   \n",
+       "2  580323127089082368            False  2307392966.0  2535310842   \n",
+       "3  580325737619685377            False  2535310842.0  2535310842   \n",
+       "4  580321203757387776             True           nan    92771309   \n",
+       "\n",
+       "   tweet_length  urls_count            ...             user.tweets_count  \\\n",
+       "0            98           1            ...                        107042   \n",
+       "1           109           1            ...                          2076   \n",
+       "2            36           0            ...                           701   \n",
+       "3            72           0            ...                           701   \n",
+       "4            85           1            ...                         11447   \n",
+       "\n",
+       "   user.verified  user.followers_count  user.listed_count  user.friends_count  \\\n",
+       "0           True                179430               3550                  74   \n",
+       "1          False                   988                  7                1782   \n",
+       "2          False                    62                  1                 121   \n",
+       "3          False                    62                  1                 121   \n",
+       "4           True                 20839                369                1354   \n",
+       "\n",
+       "  user.time_zone  user.desc_length  user.has_bg_img  user.default_pic  \\\n",
+       "0         Madrid               115             True             False   \n",
+       "1            NaN               121             True              True   \n",
+       "2            NaN                34            False             False   \n",
+       "3            NaN                34            False             False   \n",
+       "4         London               108             True             False   \n",
+       "\n",
+       "            user.created_at  \n",
+       "0 2007-08-21 14:03:19+00:00  \n",
+       "1 2014-01-23 23:26:57+00:00  \n",
+       "2 2014-05-30 15:39:18+00:00  \n",
+       "3 2014-05-30 15:39:18+00:00  \n",
+       "4 2009-11-26 15:08:39+00:00  \n",
+       "\n",
+       "[5 rows x 27 columns]"
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "gw.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The `describe` method will give summary information about each column in the dataframe. Each of these columns, except `is_truncated` should have two unique values."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>is_rumor</th>\n",
+       "      <th>is_source_tweet</th>\n",
+       "      <th>is_truncated</th>\n",
+       "      <th>has_smile_emoji</th>\n",
+       "      <th>user.verified</th>\n",
+       "      <th>user.has_bg_img</th>\n",
+       "      <th>user.default_pic</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>count</th>\n",
+       "      <td>4489</td>\n",
+       "      <td>4489</td>\n",
+       "      <td>4489</td>\n",
+       "      <td>4489</td>\n",
+       "      <td>4489</td>\n",
+       "      <td>4489</td>\n",
+       "      <td>4489</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>unique</th>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>top</th>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>freq</th>\n",
+       "      <td>2494</td>\n",
+       "      <td>4020</td>\n",
+       "      <td>4489</td>\n",
+       "      <td>4487</td>\n",
+       "      <td>4109</td>\n",
+       "      <td>3992</td>\n",
+       "      <td>2827</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "       is_rumor is_source_tweet is_truncated has_smile_emoji user.verified  \\\n",
+       "count      4489            4489         4489            4489          4489   \n",
+       "unique        2               2            1               2             2   \n",
+       "top        True           False        False           False         False   \n",
+       "freq       2494            4020         4489            4487          4109   \n",
+       "\n",
+       "       user.has_bg_img user.default_pic  \n",
+       "count             4489             4489  \n",
+       "unique               2                2  \n",
+       "top               True            False  \n",
+       "freq              3992             2827  "
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "gw.describe(include=\"bool\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>tweet_length</th>\n",
+       "      <th>urls_count</th>\n",
+       "      <th>hashtags_count</th>\n",
+       "      <th>retweet_count</th>\n",
+       "      <th>favorite_count</th>\n",
+       "      <th>mentions_count</th>\n",
+       "      <th>user.tweets_count</th>\n",
+       "      <th>user.followers_count</th>\n",
+       "      <th>user.listed_count</th>\n",
+       "      <th>user.friends_count</th>\n",
+       "      <th>user.desc_length</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>count</th>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4.489000e+03</td>\n",
+       "      <td>4.489000e+03</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "      <td>4489.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>mean</th>\n",
+       "      <td>90.788372</td>\n",
+       "      <td>0.185787</td>\n",
+       "      <td>0.298062</td>\n",
+       "      <td>25.290933</td>\n",
+       "      <td>9.049677</td>\n",
+       "      <td>1.506572</td>\n",
+       "      <td>2.754861e+04</td>\n",
+       "      <td>1.873913e+05</td>\n",
+       "      <td>1814.252172</td>\n",
+       "      <td>1576.522834</td>\n",
+       "      <td>82.602584</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>std</th>\n",
+       "      <td>39.920378</td>\n",
+       "      <td>0.400827</td>\n",
+       "      <td>0.693938</td>\n",
+       "      <td>163.969869</td>\n",
+       "      <td>70.400399</td>\n",
+       "      <td>1.020736</td>\n",
+       "      <td>9.352755e+04</td>\n",
+       "      <td>1.345395e+06</td>\n",
+       "      <td>11458.251488</td>\n",
+       "      <td>8865.247468</td>\n",
+       "      <td>56.157491</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>min</th>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>1.000000e+00</td>\n",
+       "      <td>0.000000e+00</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>25%</th>\n",
+       "      <td>56.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>1.810000e+03</td>\n",
+       "      <td>1.190000e+02</td>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>184.000000</td>\n",
+       "      <td>30.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>50%</th>\n",
+       "      <td>97.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>7.685000e+03</td>\n",
+       "      <td>4.770000e+02</td>\n",
+       "      <td>10.000000</td>\n",
+       "      <td>448.000000</td>\n",
+       "      <td>88.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>75%</th>\n",
+       "      <td>130.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>2.568100e+04</td>\n",
+       "      <td>2.288000e+03</td>\n",
+       "      <td>46.000000</td>\n",
+       "      <td>1210.000000</td>\n",
+       "      <td>135.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>max</th>\n",
+       "      <td>151.000000</td>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>8.000000</td>\n",
+       "      <td>4388.000000</td>\n",
+       "      <td>2541.000000</td>\n",
+       "      <td>12.000000</td>\n",
+       "      <td>4.420429e+06</td>\n",
+       "      <td>2.530309e+07</td>\n",
+       "      <td>163464.000000</td>\n",
+       "      <td>453460.000000</td>\n",
+       "      <td>160.000000</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "       tweet_length   urls_count  hashtags_count  retweet_count  \\\n",
+       "count   4489.000000  4489.000000     4489.000000    4489.000000   \n",
+       "mean      90.788372     0.185787        0.298062      25.290933   \n",
+       "std       39.920378     0.400827        0.693938     163.969869   \n",
+       "min        5.000000     0.000000        0.000000       0.000000   \n",
+       "25%       56.000000     0.000000        0.000000       0.000000   \n",
+       "50%       97.000000     0.000000        0.000000       0.000000   \n",
+       "75%      130.000000     0.000000        0.000000       0.000000   \n",
+       "max      151.000000     2.000000        8.000000    4388.000000   \n",
+       "\n",
+       "       favorite_count  mentions_count  user.tweets_count  \\\n",
+       "count     4489.000000     4489.000000       4.489000e+03   \n",
+       "mean         9.049677        1.506572       2.754861e+04   \n",
+       "std         70.400399        1.020736       9.352755e+04   \n",
+       "min          0.000000        0.000000       1.000000e+00   \n",
+       "25%          0.000000        1.000000       1.810000e+03   \n",
+       "50%          0.000000        1.000000       7.685000e+03   \n",
+       "75%          1.000000        2.000000       2.568100e+04   \n",
+       "max       2541.000000       12.000000       4.420429e+06   \n",
+       "\n",
+       "       user.followers_count  user.listed_count  user.friends_count  \\\n",
+       "count          4.489000e+03        4489.000000         4489.000000   \n",
+       "mean           1.873913e+05        1814.252172         1576.522834   \n",
+       "std            1.345395e+06       11458.251488         8865.247468   \n",
+       "min            0.000000e+00           0.000000            0.000000   \n",
+       "25%            1.190000e+02           2.000000          184.000000   \n",
+       "50%            4.770000e+02          10.000000          448.000000   \n",
+       "75%            2.288000e+03          46.000000         1210.000000   \n",
+       "max            2.530309e+07      163464.000000       453460.000000   \n",
+       "\n",
+       "       user.desc_length  \n",
+       "count       4489.000000  \n",
+       "mean          82.602584  \n",
+       "std           56.157491  \n",
+       "min            0.000000  \n",
+       "25%           30.000000  \n",
+       "50%           88.000000  \n",
+       "75%          135.000000  \n",
+       "max          160.000000  "
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "gw.describe()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Thread Level Features\n",
+    "\n",
+    "* **Bold features** represent high performing features identified in C. Buntain and J. Golbeck, [\"Automatically Identifying Fake News in Popular Twitter Threads\"](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8118443&isnumber=8118402)\n",
+    "* Features that are normalized are normalized by thread length\n",
+    "\n",
+    "\n",
+    "| Name                | Description                               | Type    | Notes |\n",
+    "| ---                 | ---                                       | ---     | ----- |\n",
+    "| thread              | Tweet ID of the source tweet              | `str`   | |\n",
+    "| favorite_count      | Normalized favorite total                 | `float` | |\n",
+    "| retweet_count       | Normlaized retweet total                  | `float` | |\n",
+    "| **hashtags_count**  | Normlaized hashtag total                  | `float` | |\n",
+    "| urls_count          | URL total normalized by thread length     | `float`  | |\n",
+    "| user.tweets_count   | Total tweets by thread users              | `float` | |\n",
+    "| event               | Name of PHEME event                       | `str`  | |\n",
+    "| is_rumor            | Either rumor or nonrumor                  | `bool` | |\n",
+    "| thread_length       | Number of tweets in the thread            | `int`  | |\n",
+    "| user.has_bg_img     | Ratio of users who have bg image          | `float`| |\n",
+    "| user.default_pic    | Ratio of users with default profile pic   | `float`| |\n",
+    "| **has_smile_emoji** | Number of smile emojis in the thread      | `int`  | 😊 is the smile emoji |\n",
+    "| user.verified       | Count of verified users in the thread normalized by thread length     | `float`  | |\n",
+    "| **src.followers_count** | The number of followers of the original poster of the thread. | `int` | |\n",
+    "| src.listed_count    | ??? | `int` | |\n",
+    "| src.user_verified   | ??? | `int` | |\n",
+    "| src.tweets_total    | ??? | `int` | |\n",
+    "| reply_var           | The variance in the timestamps of responses to the source tweet | `float` |\n",
+    "| src_age             | Difference in src user's creation and tweet creation            | `int`   | Measured in seconds |\n",
+    "| time_to_first_resp  | The difference between tweet creation datetime and 1st reply    | `int`   | Measured in seconds |\n",
+    "| time_to_last_resp   | The difference between tweet creation datetime and last reply   | `int`   | Measured in seconds |"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "\n",
+    "def agg_tweets_by_thread(df):\n",
+    "\n",
+    "    # Returns the proportion of True/1 values in col\n",
+    "    normal_sum = lambda col : np.sum(col) / len(col)\n",
+    "    agg_props = {\n",
+    "        \"favorite_count\": normal_sum,\n",
+    "        \"retweet_count\": normal_sum,\n",
+    "        \"hashtags_count\": normal_sum,    \n",
+    "        \"urls_count\": normal_sum,\n",
+    "        \"user.tweets_count\": normal_sum,        \n",
+    "        \"event\": max,\n",
+    "        \"is_rumor\": max,\n",
+    "        \"tweet_id\": len,\n",
+    "        \"user.has_bg_img\": normal_sum,\n",
+    "        \"user.default_pic\": normal_sum,\n",
+    "        \"has_smile_emoji\": normal_sum,\n",
+    "        \"user.verified\": normal_sum,\n",
+    "    }\n",
+    "    rename = {\n",
+    "        \"tweet_id\": \"thread_length\",\n",
+    "        \"has_url\":\"url_proportion\",\n",
+    "    }\n",
+    "    agg = df.groupby(\"thread\").agg(agg_props).rename(columns=rename)\n",
+    "    src = df[df[\"is_source_tweet\"] == True][[\"thread\", \n",
+    "                                          \"user.followers_count\", \n",
+    "                                          \"user.listed_count\",\n",
+    "                                          \"user.verified\",\n",
+    "                                          \"created\",\n",
+    "                                          \"user.created_at\",\n",
+    "                                          \"user.tweets_count\"]] \\\n",
+    "                         .rename(columns={\"user.followers_count\": \"src.followers_count\",\n",
+    "                                          \"user.listed_count\": \"src.listed_count\",\n",
+    "                                          \"user.verified\": \"src.user_verified\",\n",
+    "                                          \"user.created_at\": \"src.created_at\",\n",
+    "                                          \"user.tweets_count\": \"src.tweets_total\"})\n",
+    "    \n",
+    "    def f(x):\n",
+    "        d = []\n",
+    "        d.append(min(x[\"created\"]))\n",
+    "        d.append(max(x[\"created\"]))\n",
+    "        d.append(np.var(to_unix_tmsp(x[\"created\"])))\n",
+    "        return pd.Series(d, index=[\"first_resp\", \"last_resp\",\"resp_var\"])\n",
+    "        \n",
+    "    replies = df[df[\"is_source_tweet\"] == False] \\\n",
+    "        .groupby(\"thread\") \\\n",
+    "        .apply(f)\n",
+    "\n",
+    "    dfs = [agg, src, replies]\n",
+    "    thrd_data = reduce(lambda left, right: pd.merge(left,right, on=\"thread\"), dfs)\n",
+    "    \n",
+    "    thrd_data[\"src_age\"] = thrd_data[\"created\"] - src[\"src.created_at\"]\n",
+    "    thrd_data[\"time_to_first_resp\"] = thrd_data[\"first_resp\"] - thrd_data[\"created\"]\n",
+    "    thrd_data[\"time_to_last_resp\"] = thrd_data[\"last_resp\"] - thrd_data[\"created\"]\n",
+    "    \n",
+    "    return thrd_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>thread</th>\n",
+       "      <th>favorite_count</th>\n",
+       "      <th>retweet_count</th>\n",
+       "      <th>hashtags_count</th>\n",
+       "      <th>urls_count</th>\n",
+       "      <th>user.tweets_count</th>\n",
+       "      <th>event</th>\n",
+       "      <th>is_rumor</th>\n",
+       "      <th>thread_length</th>\n",
+       "      <th>user.has_bg_img</th>\n",
+       "      <th>...</th>\n",
+       "      <th>src.user_verified</th>\n",
+       "      <th>created</th>\n",
+       "      <th>src.created_at</th>\n",
+       "      <th>src.tweets_total</th>\n",
+       "      <th>first_resp</th>\n",
+       "      <th>last_resp</th>\n",
+       "      <th>resp_var</th>\n",
+       "      <th>src_age</th>\n",
+       "      <th>time_to_first_resp</th>\n",
+       "      <th>time_to_last_resp</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>580317556516483072</td>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>72.250000</td>\n",
+       "      <td>0.125</td>\n",
+       "      <td>0.125</td>\n",
+       "      <td>7065.875000</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>True</td>\n",
+       "      <td>8</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2015-03-24 10:37:41+00:00</td>\n",
+       "      <td>2014-01-07 11:38:00+00:00</td>\n",
+       "      <td>14408</td>\n",
+       "      <td>2015-03-24 10:38:17+00:00</td>\n",
+       "      <td>2015-03-24 10:47:31+00:00</td>\n",
+       "      <td>2.810739e+10</td>\n",
+       "      <td>2771 days 20:34:22</td>\n",
+       "      <td>00:00:36</td>\n",
+       "      <td>00:09:50</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>580317998147325952</td>\n",
+       "      <td>0.666667</td>\n",
+       "      <td>13.333333</td>\n",
+       "      <td>0.000</td>\n",
+       "      <td>0.000</td>\n",
+       "      <td>40102.333333</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>True</td>\n",
+       "      <td>3</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2015-03-24 10:39:27+00:00</td>\n",
+       "      <td>2009-08-20 15:42:13+00:00</td>\n",
+       "      <td>87411</td>\n",
+       "      <td>2015-03-24 10:41:08+00:00</td>\n",
+       "      <td>2015-03-24 10:42:28+00:00</td>\n",
+       "      <td>1.600000e+09</td>\n",
+       "      <td>2201 days 10:01:11</td>\n",
+       "      <td>00:01:41</td>\n",
+       "      <td>00:03:01</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>580318020192571392</td>\n",
+       "      <td>0.500000</td>\n",
+       "      <td>13.500000</td>\n",
+       "      <td>0.000</td>\n",
+       "      <td>0.500</td>\n",
+       "      <td>18904.000000</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>True</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2015-03-24 10:39:32+00:00</td>\n",
+       "      <td>2007-05-08 16:02:23+00:00</td>\n",
+       "      <td>22201</td>\n",
+       "      <td>2015-03-24 11:54:08+00:00</td>\n",
+       "      <td>2015-03-24 11:54:08+00:00</td>\n",
+       "      <td>0.000000e+00</td>\n",
+       "      <td>2201 days 10:01:16</td>\n",
+       "      <td>01:14:36</td>\n",
+       "      <td>01:14:36</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>580318210609696769</td>\n",
+       "      <td>4.500000</td>\n",
+       "      <td>23.000000</td>\n",
+       "      <td>1.000</td>\n",
+       "      <td>0.000</td>\n",
+       "      <td>39374.500000</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>True</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>True</td>\n",
+       "      <td>2015-03-24 10:40:17+00:00</td>\n",
+       "      <td>2009-03-26 12:33:47+00:00</td>\n",
+       "      <td>13875</td>\n",
+       "      <td>2015-03-24 10:43:30+00:00</td>\n",
+       "      <td>2015-03-24 10:43:30+00:00</td>\n",
+       "      <td>0.000000e+00</td>\n",
+       "      <td>2201 days 10:02:01</td>\n",
+       "      <td>00:03:13</td>\n",
+       "      <td>00:03:13</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>580318669483413504</td>\n",
+       "      <td>1.800000</td>\n",
+       "      <td>12.200000</td>\n",
+       "      <td>0.600</td>\n",
+       "      <td>0.600</td>\n",
+       "      <td>21730.000000</td>\n",
+       "      <td>germanwings-crash</td>\n",
+       "      <td>True</td>\n",
+       "      <td>5</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2015-03-24 10:42:07+00:00</td>\n",
+       "      <td>2009-09-29 13:06:54+00:00</td>\n",
+       "      <td>5426</td>\n",
+       "      <td>2015-03-24 11:53:05+00:00</td>\n",
+       "      <td>2015-03-24 17:27:43+00:00</td>\n",
+       "      <td>5.194105e+13</td>\n",
+       "      <td>1943 days 19:33:28</td>\n",
+       "      <td>01:10:58</td>\n",
+       "      <td>06:45:36</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>5 rows × 25 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "               thread  favorite_count  retweet_count  hashtags_count  \\\n",
+       "0  580317556516483072        5.000000      72.250000           0.125   \n",
+       "1  580317998147325952        0.666667      13.333333           0.000   \n",
+       "2  580318020192571392        0.500000      13.500000           0.000   \n",
+       "3  580318210609696769        4.500000      23.000000           1.000   \n",
+       "4  580318669483413504        1.800000      12.200000           0.600   \n",
+       "\n",
+       "   urls_count  user.tweets_count              event  is_rumor  thread_length  \\\n",
+       "0       0.125        7065.875000  germanwings-crash      True              8   \n",
+       "1       0.000       40102.333333  germanwings-crash      True              3   \n",
+       "2       0.500       18904.000000  germanwings-crash      True              2   \n",
+       "3       0.000       39374.500000  germanwings-crash      True              2   \n",
+       "4       0.600       21730.000000  germanwings-crash      True              5   \n",
+       "\n",
+       "   user.has_bg_img        ...         src.user_verified  \\\n",
+       "0              1.0        ...                     False   \n",
+       "1              1.0        ...                     False   \n",
+       "2              1.0        ...                     False   \n",
+       "3              1.0        ...                      True   \n",
+       "4              1.0        ...                     False   \n",
+       "\n",
+       "                    created            src.created_at  src.tweets_total  \\\n",
+       "0 2015-03-24 10:37:41+00:00 2014-01-07 11:38:00+00:00             14408   \n",
+       "1 2015-03-24 10:39:27+00:00 2009-08-20 15:42:13+00:00             87411   \n",
+       "2 2015-03-24 10:39:32+00:00 2007-05-08 16:02:23+00:00             22201   \n",
+       "3 2015-03-24 10:40:17+00:00 2009-03-26 12:33:47+00:00             13875   \n",
+       "4 2015-03-24 10:42:07+00:00 2009-09-29 13:06:54+00:00              5426   \n",
+       "\n",
+       "                 first_resp                 last_resp      resp_var  \\\n",
+       "0 2015-03-24 10:38:17+00:00 2015-03-24 10:47:31+00:00  2.810739e+10   \n",
+       "1 2015-03-24 10:41:08+00:00 2015-03-24 10:42:28+00:00  1.600000e+09   \n",
+       "2 2015-03-24 11:54:08+00:00 2015-03-24 11:54:08+00:00  0.000000e+00   \n",
+       "3 2015-03-24 10:43:30+00:00 2015-03-24 10:43:30+00:00  0.000000e+00   \n",
+       "4 2015-03-24 11:53:05+00:00 2015-03-24 17:27:43+00:00  5.194105e+13   \n",
+       "\n",
+       "             src_age  time_to_first_resp time_to_last_resp  \n",
+       "0 2771 days 20:34:22            00:00:36          00:09:50  \n",
+       "1 2201 days 10:01:11            00:01:41          00:03:01  \n",
+       "2 2201 days 10:01:16            01:14:36          01:14:36  \n",
+       "3 2201 days 10:02:01            00:03:13          00:03:13  \n",
+       "4 1943 days 19:33:28            01:10:58          06:45:36  \n",
+       "\n",
+       "[5 rows x 25 columns]"
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "gw_thrds = agg_tweets_by_thread(gw)\n",
+    "gw_thrds.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'Wrote data to data/threads/germanwings-crash.csv'"
+      ]
+     },
+     "execution_count": 9,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "fn = \"data/threads/germanwings-crash.csv\"\n",
+    "gw_thrds.to_csv(fn)\n",
+    "\"Wrote data to %s\" % fn"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 81,
+   "metadata": {
+    "collapsed": false,
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "['thread' 'default_profile_proportion' 'retweet_total' 'thread_length'\n",
+      " 'smile_emoji_proportion' 'geo_enabled_proportion' 'symbol_total'\n",
+      " 'url_proportion' 'hashtag_proportion' 'favorite_total'\n",
+      " 'src_followers_count' 'src_listed_count' 'src_user_verified' 'created'\n",
+      " 'src_user_geo_enabled' 'src_user_creation_date' 'src_tweets_total'\n",
+      " 'first_resp' 'last_resp' 'resp_var']\n"
+     ]
+    }
+   ],
+   "source": [
+    "ottawa_threads = agg_event_data(ottawashooting)\n",
+    "\n",
+    "# Save CSV file in /data directory\n",
+    "ottawa_threads.to_csv(\"data/pheme-rnr-dataset/ottawashooting_threads.csv\")\n",
+    "\n",
+    "# import math\n",
+    "# Print the first five rows\n",
+    "ottawa_threads.head()\n",
+    "ottawa_threads_rumortags=ottawa_threads[\"is_rumor\"]\n",
+    "ottawa_threads=ottawa_threads.drop(['is_rumor'],axis=1)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### used functions:"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Data Preprocessing:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 40,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(857, 19)\n"
+     ]
+    }
+   ],
+   "source": [
+    "<<<<<<< REMOTE CELL DELETED >>>>>>>\n",
+    "ottawa_threads_values=ottawa_threads.values\n",
+    "n,d=ottawa_threads_values.shape\n",
+    "ottawa_threads_values=convertTrueFalseTo01(ottawa_threads_values[:,1:d])\n",
+    "n,d=ottawa_threads_values.shape\n",
+    "\n",
+    "ottawa_threads_rumortags_values=convertTrueFalseTo01(ottawa_threads_rumortags.values)\n",
+    "\n",
+    "ottawa_threads_values,_,_=standardize_cols(ottawa_threads_values.astype(float))\n",
+    "\n",
+    "n,d=ottawa_threads_values.shape\n",
+    "print(ottawa_threads_values.shape)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### PCA:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "metadata": {
+    "collapsed": false,
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "model=PCA(n_components=2)\n",
+    "model.fit(ottawa_threads_values)\n",
+    "Z_PCA=model.transform(ottawa_threads_values)\n",
+    "plt.figure()\n",
+    "plt.title(\"PCA\")\n",
+    "plt.scatter(Z_PCA[:,0],Z_PCA[:,1],c=ottawa_threads_rumortags_values)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### TSNE:"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Isomap:"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### SparsePCA:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 117,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "model=SparsePCA(n_components=2,normalize_components=True)\n",
+    "model.fit(ottawa_threads_values)\n",
+    "Z_PCA=model.transform(ottawa_threads_values)\n",
+    "plt.figure()\n",
+    "plt.title(\"SparsePCA\")\n",
+    "plt.scatter(Z_PCA[:,0],Z_PCA[:,1],c=ottawa_threads_rumortags_values)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### KernelPCA:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 120,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "model=KernelPCA(n_components=2)\n",
+    "model.fit(ottawa_threads_values)\n",
+    "Z_PCA=model.transform(ottawa_threads_values)\n",
+    "plt.figure()\n",
+    "plt.title(\"KernelPCA\")\n",
+    "plt.scatter(Z_PCA[:,0],Z_PCA[:,1],c=ottawa_threads_rumortags_values)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Running some classifiers\n",
+    "### Train and Test data separation:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(642, 19) (215, 19) (642,)\n",
+      "y_train bincount: [0.46573209 0.53426791]\n",
+      "y_test bincount: [0.46976744 0.53023256]\n"
+     ]
+    }
+   ],
+   "source": [
+    "X_train, X_test, y_train, y_test = train_test_split(ottawa_threads_values, ottawa_threads_rumortags_values, test_size=0.25, random_state=45)\n",
+    "le = preprocessing.LabelEncoder()\n",
+    "le.fit(y_train)\n",
+    "y_train=le.transform(y_train)\n",
+    "y_test=le.transform(y_test)\n",
+    "print(X_train.shape,X_test.shape,y_train.shape)\n",
+    "print('y_train bincount:', np.bincount(y_train)/np.sum(np.bincount(y_train)))\n",
+    "print('y_test bincount:', np.bincount(y_test)/np.sum(np.bincount(y_test)))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### SVM.SVC:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def test_model(model):\n",
+    "    model.fit(X_train,y_train)\n",
+    "    y_test_hat=model.predict(X_test)\n",
+    "    print('train error:', np.mean(model.predict(X_train)==y_train))\n",
+    "    print('test error:', np.mean(y_test_hat==y_test))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 58,
+   "metadata": {
+    "collapsed": false,
+    "scrolled": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "train error: 0.7601246105919003\n",
+      "test error: 0.6976744186046512\n"
+     ]
+    }
+   ],
+   "source": [
+    "clf = svm.SVC(gamma='scale', kernel='linear', C=1)\n",
+    "test_model(model)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 63,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "train error: 0.7601246105919003\n",
+      "test error: 0.6976744186046512\n"
+     ]
+    }
+   ],
+   "source": [
+    "model = KNeighborsClassifier(n_neighbors=5)\n",
+    "test_model(model)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 68,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "train error: 1.0\n",
+      "test error: 0.6511627906976745\n"
+     ]
+    }
+   ],
+   "source": [
+    "model=DecisionTreeClassifier(random_state=0)\n",
+    "test_model(model)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 93,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "train error: 0.7741433021806854\n",
+      "test error: 0.6976744186046512\n"
+     ]
+    }
+   ],
+   "source": [
+    "model=RandomForestClassifier(n_estimators=100, max_depth=4, random_state=4, max_features=2)\n",
+    "test_model(model)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 81,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "train error: 0.8551401869158879\n",
+      "test error: 0.6744186046511628\n"
+     ]
+    }
+   ],
+   "source": [
+    "model=AdaBoostClassifier(n_estimators=100)\n",
+    "test_model(model)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 87,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "train error: 0.719626168224299\n",
+      "test error: 0.6465116279069767\n"
+     ]
+    }
+   ],
+   "source": [
+    "model=GaussianProcessClassifier(1.0 * RBF(1.0))\n",
+    "test_model(model)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.6.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}

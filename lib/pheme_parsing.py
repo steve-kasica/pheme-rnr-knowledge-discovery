@@ -1,13 +1,9 @@
-"""
-    @name :pheme_parsing.py
-    @description: A Python 3 module for parsing raw data from the PHEME rumor non-rumor dataset and saving it in tabular form
-    @author: Steve Kasica <kasica@alumni.cs.ubc.ca>
-"""
-
-import os, json, errno, time
+# Load dependencies for this Jupyter Notebook
+import os, json, errno
 import pandas as pd
 import numpy as np
 from sys import argv
+import time
 
 def pheme_to_csv(event):
     """ Parses json data stored in directories of the PHEME dataset into a CSV file.
@@ -22,6 +18,7 @@ def pheme_to_csv(event):
     dataset = "raw/pheme-rnr-dataset"
     thread_number = 0         
     for category in os.listdir("%s/%s" % (dataset, event)):
+        print('category:',category,category=='rumours')
         for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
             with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
                 tweet = json.load(f)

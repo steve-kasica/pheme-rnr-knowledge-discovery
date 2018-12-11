@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from sys import argv
 import time
+from util import to_unix_tmsp, parse_twitter_datetime
 
 def pheme_to_csv(event):
     """ Parses json data stored in directories of the PHEME dataset into a CSV file.
@@ -77,7 +78,7 @@ class Tweets:
             "favorite_count": lambda obj : obj.get("favorite_count"),
             "mentions_count": lambda obj : len(obj["entities"].get("user_mentions", "")),
             "is_truncated": lambda obj : 1 if obj.get("truncated") else 0,
-            "created": lambda obj : obj.get("created_at"),
+            "created": lambda obj : self.datestr_to_tmsp(obj.get("created_at")),
             "has_smile_emoji": lambda obj: 1 if "😊" in obj["text"] else 0,
 
             # User metadata
@@ -90,7 +91,7 @@ class Tweets:
             "user.desc_length": lambda obj: len(obj["user"]["description"]) if obj["user"]["description"] else 0,
             "user.has_bg_img": lambda obj: 1 if obj["user"].get("profile_use_background_image") else 0,
             "user.default_pic": lambda obj: 1 if obj["user"].get("default_profile") else 0,
-            "user.created_at": lambda obj: obj["user"].get("created_at"),
+            "user.created_at": lambda obj: self.datestr_to_tmsp(obj["user"].get("created_at")),
         
         # Other future features
         # "user.location": twt["user"]["location"],
@@ -106,6 +107,15 @@ class Tweets:
         fn = "data/tweets/%s.csv" % (self.event)
         df = pd.DataFrame(data=self.data)
         df.to_csv(fn, index=False)
+    
+    def datestr_to_tmsp(self, datestr):
+        """ Converts Twitter's datetime format to Unix timestamp 
+
+        Param:
+            - datestr: datetime string, e.g. Mon Dec 10 4:12:32.33 +7000 2018
+        Return: Unix timestamp
+        """
+        return to_unix_tmsp([parse_twitter_datetime(datestr)])[0]
 
 def agg_event_data(df, limit=0):
     """ Aggregate tabular tweet data from a PHEME event into aggregated thread-level data

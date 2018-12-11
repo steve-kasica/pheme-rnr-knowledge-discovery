@@ -1,7 +1,6 @@
 """
     @name: util.py
     @description: A module of utility functions used in Jupyter Notebooks
-    @author: Steve Kasica <kasica@alumni.cs.ubc.ca>
 """
 
 import pandas as pd
@@ -21,25 +20,19 @@ def fetch_tweets(event):
     """
     return pd.read_csv("data/tweets/%s.csv" % event, 
                  dtype={
-                    'is_source_tweet': np.bool,
-                    'is_rumor': np.bool,
-                    'is_truncated': np.bool,
-                    'user.verified': np.bool,
-                    'user.default_pic': np.bool,
-                    "has_smile_emoji": np.bool,
-                    'user.has_bg_img': np.bool,
                     'tweet_id': str,
                     'in_reply_tweet': str,
                     'thread': str,
                     'user_id': str,
                     'in_reply_user': str
                  },
-                 parse_dates=['created', 'user.created_at'],
-                 date_parser=lambda timestr: pd.datetime.strptime(timestr, "%a %b %d %H:%M:%S %z %Y"),
                  engine="python")
 
 def to_unix_tmsp(col):
     return pd.DatetimeIndex(col).astype(np.int64) / 1e6
+
+def parse_twitter_datetime(timestr):
+    return pd.datetime.strptime(timestr, "%a %b %d %H:%M:%S %z %Y")
 
 def fetch():
     pass

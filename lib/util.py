@@ -34,5 +34,18 @@ def to_unix_tmsp(col):
 def parse_twitter_datetime(timestr):
     return pd.datetime.strptime(timestr, "%a %b %d %H:%M:%S %z %Y")
 
-def fetch():
-    pass
+def fetch_X(thread_level_csv_file_address):
+    """ Read a CSV file with thread-level features and drop all column that are not used in prediction.
+    
+    Note: 
+        - Setting engine to "python" helps with large datasets
+    
+    Params:
+        - event {str} the name of the event
+    
+    Return: a Pandas dataframe
+    
+    """
+    X= pd.read_csv(thread_level_csv_file_address,engine="python")
+    X=gw_thrds_without_rumor_tag=X.drop(['event'],axis=1)
+    return X

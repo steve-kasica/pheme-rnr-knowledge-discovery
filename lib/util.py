@@ -33,3 +33,6 @@ def to_unix_tmsp(col):
 
 def parse_twitter_datetime(timestr):
     return pd.datetime.strptime(timestr, "%a %b %d %H:%M:%S %z %Y")
+
+def fetch():
+    pass

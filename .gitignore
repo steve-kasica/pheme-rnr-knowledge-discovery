@@ -6,3 +6,7 @@ raw/**/*
 # Ignore Python or Jupyter things
 .ipynb_checkpoints
 __pycache__
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*

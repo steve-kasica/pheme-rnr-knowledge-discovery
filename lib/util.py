@@ -40,3 +40,6 @@ def fetch_tweets(event):
 
 def to_unix_tmsp(col):
     return pd.DatetimeIndex(col).astype(np.int64) / 1e6
+
+def fetch():
+    pass

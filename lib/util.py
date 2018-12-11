@@ -29,9 +29,11 @@ def fetch_tweets(event):
                  engine="python")
 
 def to_unix_tmsp(col):
+    """ Convert Datetime instance to Unix timestamp """
     return pd.DatetimeIndex(col).astype(np.int64) / 1e6
 
 def parse_twitter_datetime(timestr):
+    """ Convert Twitter's datetime format into a Datetime instance """
     return pd.datetime.strptime(timestr, "%a %b %d %H:%M:%S %z %Y")
 
 def fetch():

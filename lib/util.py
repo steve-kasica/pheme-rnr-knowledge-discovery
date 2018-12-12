@@ -51,3 +51,17 @@ def fetch_X(thread_level_csv_file_address):
     X= pd.read_csv(thread_level_csv_file_address,engine="python")
     X=gw_thrds_without_rumor_tag=X.drop(['event'],axis=1)
     return X
+
+def fetch_thread(event, is_normalized=True):
+    """ Return dataset X and results vector y 
+    
+    Params:
+        - event {str} the name of the event in the PHEME dataset
+        - is_normalized {bool} returned X matrix as normalized. Deafult is True
+    """ 
+    X = pd.read_csv("data/threads/%s.csv" % event, engine="python")
+    y = X.is_rumor
+    X = X.drop(["is_rumor", "thread"], axis=1)
+    if is_normalized:
+        X = (X - X.mean()) / X.std()
+    return X, y

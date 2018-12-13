@@ -39,6 +39,10 @@ class Tweets:
     def __init__(self, event_name):
         self.event = event_name
         self.data = {}
+        utc_offset = {
+            "germanwings-crash": 1
+        }
+        self.utc_offset = utc_offset[self.event]
     
     def append(self, twt, cat, thrd, is_src):
         """ Convert tweet metadata into features.
@@ -56,6 +60,11 @@ class Tweets:
         twt["thread"] = thrd
         twt["event"] = self.event
         twt["is_src"] = is_src
+        
+        def get_utc_dist(obj):
+            offset = obj["user"].get("utc_offset")
+            conversion = 3600
+            return abs(self.utc_offset - offset / conversion) if offset else None
 
         features = {
             # Thread metadata
@@ -72,7 +81,10 @@ class Tweets:
             
             # Tweet metadata
             "tweet_length": lambda obj : len(obj.get("text","")),
+            "symbol_count": lambda obj: len(obj["entities"].get("symbols", [])),
+            "user_mentions": lambda obj: len(obj["entities"].get("user_mentions", [])),
             "urls_count": lambda obj : len(obj["entities"].get("urls", [])),
+            "media_count": lambda obj: len(obj["entities"].get("media", [])),
             "hashtags_count": lambda obj : len(obj["entities"].get("hashtags", [])),
             "retweet_count": lambda obj : obj.get("retweet_count", 0),
             "favorite_count": lambda obj : obj.get("favorite_count"),
@@ -80,24 +92,29 @@ class Tweets:
             "is_truncated": lambda obj : 1 if obj.get("truncated") else 0,
             "created": lambda obj : self.datestr_to_tmsp(obj.get("created_at")),
             "has_smile_emoji": lambda obj: 1 if "😊" in obj["text"] else 0,
+            "sensitive": lambda obj: 1 if obj.get("possibly_sensitive") else 0,
+            "has_place": lambda obj: 1 if obj.get("place") else 0,
+            "has_coords": lambda obj: 1 if obj.get("coordinates") else 0,
 
             # User metadata
             "user.tweets_count": lambda obj: obj["user"].get("statuses_count", 0),
             "user.verified": lambda obj: 1 if obj["user"].get("verified") else 0,
             "user.followers_count": lambda obj: obj["user"].get("followers_count"),
             "user.listed_count": lambda obj: obj["user"].get("listed_count"),
+            "user.desc_length": lambda obj: len(obj["user"].get("description", "")),
+            "user.handle_length": lambda obj: len(obj["user"].get("name", "")),
+            "user.name_length": lambda obj: len(obj["user"].get("screen_name", "")),
+            "user.notifications": lambda obj: 1 if obj["user"].get("notifications") else 0,
             "user.friends_count": lambda obj: obj["user"].get("friends_count"),
             "user.time_zone": lambda obj: obj["user"].get("time_zone"),
             "user.desc_length": lambda obj: len(obj["user"]["description"]) if obj["user"]["description"] else 0,
             "user.has_bg_img": lambda obj: 1 if obj["user"].get("profile_use_background_image") else 0,
             "user.default_pic": lambda obj: 1 if obj["user"].get("default_profile") else 0,
             "user.created_at": lambda obj: self.datestr_to_tmsp(obj["user"].get("created_at")),
-        
-        # Other future features
-        # "user.location": twt["user"]["location"],
-        # "user.geo_enabled": twt["user"]["geo_enabled"],
-        # "user.utf_offset": twt["user"]["utc_offset"],
-        # "user.contributors_enabled": twt["user"]["contributors_enabled"],
+            "user.location": lambda obj: 1 if obj["user"].get("location") else 0,
+            "user.profile_sbcolor": lambda obj: int(obj["user"].get("profile_sidebar_border_color"), 16),
+            "user.profile_bgcolor": lambda obj: int(obj["user"].get("profile_background_color"), 16),
+            "user.utc_dist": get_utc_dist,
         }
 
         for col in features:

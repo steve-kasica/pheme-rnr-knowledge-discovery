@@ -3,8 +3,17 @@ import os, json, errno
 import pandas as pd
 import numpy as np
 from sys import argv
+import string
 import time
 from util import to_unix_tmsp, parse_twitter_datetime
+
+#imports for text feature extraction:
+import nltk
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+import re
+from nltk.corpus import stopwords as stp
+from textblob import TextBlob
 
 def pheme_to_csv(event):
     """ Parses json data stored in directories of the PHEME dataset into a CSV file.
@@ -16,7 +25,7 @@ def pheme_to_csv(event):
     """
     start = time.time()
     data = Tweets(event)
-    dataset = "raw/pheme-rnr-dataset"
+    dataset = "../raw/pheme-rnr-dataset"
     thread_number = 0         
     for category in os.listdir("%s/%s" % (dataset, event)):
         print('category:',category,category=='rumours')
@@ -30,7 +39,7 @@ def pheme_to_csv(event):
                     tweet = json.load(f)
                 data.append(tweet, category, thread, False)
     data.export()
-    fn = "data/tweets/%s.csv" % (event)
+    fn = "../data/tweets/%s.csv" % (event)
     print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
     return None
 
@@ -39,6 +48,8 @@ class Tweets:
     def __init__(self, event_name):
         self.event = event_name
         self.data = {}
+        self.printable = set(string.printable)
+
         utc_offset = {
             "germanwings-crash": 1
         }
@@ -60,6 +71,16 @@ class Tweets:
         twt["thread"] = thrd
         twt["event"] = self.event
         twt["is_src"] = is_src
+
+        twt_text=twt["text"]
+        twt_text_filtered=str()
+        for c in twt_text:
+            if c in self.printable:
+                twt_text_filtered+=c
+
+        #print('twt text:',twt_text_filtered)
+        #print('type of twt_text', type(twt_text_filtered))
+        text_features=self.tweettext2features(twt_text_filtered)
         
         def get_utc_dist(obj):
             offset = obj["user"].get("utc_offset")
@@ -126,8 +147,110 @@ class Tweets:
         for col in features:
             self.data.setdefault(col, []).append(features[col](twt))
 
+        for col in text_features:
+            self.data.setdefault(col, []).append(text_features[col])
+
+    def tweettext2features(self, tweet_text):   #hasqmark hasemark hasperiod number_punct negativewordcount positivewordcount capitalratio contentlength sentimentscore Noun Verb Adjective Pronoun Adverb
+        #punctuations
+        def punctuationanalysis(tweet_text):
+            punctuations= ["\"","(",")","*",",","-","_",".","~","%","^","&","!","#",'@'
+               "=","\'","\\","+","/",":","[","]","«","»","،","؛","?",".","…","$",
+               "|","{","}","٫",";",">","<","1","2","3","4","5","6","7","8","9","0"]
+            hasqmark =sum(c =='?' for c in tweet_text)
+            hasemark =sum(c =='!' for c in tweet_text)
+            hasperiod=sum(c =='.' for c in tweet_text)
+            number_punct=sum(c in punctuations for c in tweet_text)
+            return {'hasqmark':hasqmark,'hasemark':hasemark,'hasperiod':hasperiod,'number_punct':number_punct}
+
+        def negativewordcount(tokens):
+            count = 0
+            negativeFeel = ['tired', 'sick', 'bord', 'uninterested', 'nervous', 'stressed',
+                            'afraid', 'scared', 'frightened', 'boring','bad',
+                            'distress', 'uneasy', 'angry', 'annoyed', 'pissed',"hate",
+                            'sad', 'bitter', 'down', 'depressed', 'unhappy','heartbroken','jealous']
+            for negative in negativeFeel:
+                if negative in tokens:
+                    count += 1
+            return count
+
+        def positivewordcount(tokens):
+            count = 0
+            positivewords = ['joy', ' happy', 'hope', 'kind', 'surprise'
+                            , 'excite', ' interest', 'admire',"delight","yummy",
+                            'confidenc', 'good', 'satisf', 'pleasant',
+                            'proud', 'amus', 'amazing', 'awesome',"love","passion","great","like","wow","delicious"]
+            for pos in positivewords:
+                if pos in tokens:
+                    count += 1
+            return count
+
+        def capitalratio(tweet_text):
+            uppers = [l for l in tweet_text if l.isupper()]
+            capitalratio = len(uppers) / len(tweet_text)
+            return capitalratio
+
+        def contentlength(words):
+            wordcount = len(words)
+            return wordcount
+
+        def sentimentscore(tweet_text):
+            analysis = TextBlob(tweet_text)
+            return analysis.sentiment.polarity
+
+        def getposcount(tweet_text):
+            postag = []
+            poscount = {}
+            poscount['Noun']=0
+            poscount['Verb']=0
+            poscount['Adjective'] = 0
+            poscount['Pronoun']=0
+            poscount['Adverb']=0
+            Nouns = {'NN','NNS','NNP','NNPS'}
+            Verbs={'VB','VBP','VBZ','VBN','VBG','VBD','To'}
+            word_tokens = nltk.word_tokenize(re.sub(r'([^\s\w]|_)+', '', tweet_text))
+            postag = nltk.pos_tag(word_tokens)
+            for g1 in postag:
+                if g1[1] in Nouns:
+                    poscount['Noun'] += 1
+                elif g1[1] in Verbs:
+                    poscount['Verb']+= 1
+                elif g1[1]=='ADJ'or g1[1]=='JJ':
+                    poscount['Adjective']+=1
+                elif g1[1]=='PRP' or g1[1]=='PRON':
+                    poscount['Pronoun']+=1
+                elif g1[1]=='ADV':
+                    poscount['Adverb']+=1
+            return poscount
+        def tweets2tokens(tweet_text):
+            tokens = nltk.word_tokenize(re.sub(r'([^\s\w]|_)+','', tweet_text.lower()))
+            for token in tokens:
+                if token.startswith( 'http' ):
+                    url=1
+                else:
+                    url=0
+            return tokens,url
+
+
+        # the code for def tweettext2features(tweet_text):
+        features=dict()
+
+        tokens,url=tweets2tokens(tweet_text)
+
+        punc_dict=punctuationanalysis(tweet_text)
+        features.update(punc_dict)
+        features['negativewordcount']=(negativewordcount(tokens))
+        features['positivewordcount']=(positivewordcount(tokens))
+        features['capitalratio']=(capitalratio(tweet_text))
+        features['contentlength']=(contentlength(tokens))
+        features['sentimentscore']=(sentimentscore(tweet_text))
+        pos_dict=getposcount(tweet_text)
+        features.update(pos_dict)
+        features['has_url_in_text']=(url)
+        # print("features",features)
+        return features
+
     def export(self):
-        fn = "data/tweets/%s.csv" % (self.event)
+        fn = "../data/tweets/%s.csv" % (self.event)
         df = pd.DataFrame(data=self.data)
         df.to_csv(fn, index=False)
     

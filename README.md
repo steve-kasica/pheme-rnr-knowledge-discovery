@@ -1,5 +1,6 @@
-# PHEME Rumor Non-Rumor Feature Analysis
+# Knowledge Discovery for Interpretability and Insight in Network Approaches to Automatic Fake News Dection
 
+Steve Kasica and Ali Mohammad Mehr
 
 
 ## Converting PHEME raw data into CSV files
@@ -17,3 +18,7 @@ Valid event name for the first argument of `pheme_to_csv` include:
 
 * germanwings-crash, $\approx$ 2 minutes to convert
 * ottawashooting, $\approx$ 8 minutes to convert 
+
+## Running Presentation
+
+`jupyter nbconvert presentation.ipynb --to slides --post serve`

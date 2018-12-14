@@ -102,6 +102,11 @@ class Tweets:
             "has_exclaim": lambda obj: 1 if has_exclaim else 0,
             "has_quest_or_exclaim": lambda obj: 1 if (has_question or has_exclaim) else 0,
 
+            # Tweet data
+            "text": lambda obj: obj["text"],
+            "user.handle": lambda obj: obj["user"].get("screen_name"),
+            "user.name": lambda obj: obj["user"].get("name"),
+
             # User metadata
             "user.tweets_count": lambda obj: obj["user"].get("statuses_count", 0),
             "user.verified": lambda obj: 1 if obj["user"].get("verified") else 0,

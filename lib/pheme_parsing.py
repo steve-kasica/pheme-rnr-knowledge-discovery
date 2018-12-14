@@ -150,7 +150,26 @@ class Tweets:
         for col in text_features:
             self.data.setdefault(col, []).append(text_features[col])
 
-    def tweettext2features(self, tweet_text):   #hasqmark hasemark hasperiod number_punct negativewordcount positivewordcount capitalratio contentlength sentimentscore Noun Verb Adjective Pronoun Adverb
+    def tweettext2features(self, tweet_text):   
+        """ Extracts some text features from the text of each tweet. The extracted features are as follows:
+        hasqmark: has question mark
+        hasemark: has exclamation mark
+        hasperiod: has period
+        number_punct: number of punctuation marks
+        negativewordcount: the count of the defined negative word counts
+        positivewordcount :the count of the defined positive word counts
+        capitalratio: ratio of capital letters to all the letters
+        contentlength: length of text
+        sentimentscore: sentiment score by textBlob
+        Noun: number of nouns
+        Verb: number of verbs
+        Adjective: number of adjectives
+        Pronoun: number of pronouns
+        Adverb: number of adverbs
+        Param:
+            - tweet_text: text of tweet
+        Return: a dict containing the mentioned text features
+        """
         #punctuations
         def punctuationanalysis(tweet_text):
             punctuations= ["\"","(",")","*",",","-","_",".","~","%","^","&","!","#",'@'
@@ -167,7 +186,7 @@ class Tweets:
             negativeFeel = ['tired', 'sick', 'bord', 'uninterested', 'nervous', 'stressed',
                             'afraid', 'scared', 'frightened', 'boring','bad',
                             'distress', 'uneasy', 'angry', 'annoyed', 'pissed',"hate",
-                            'sad', 'bitter', 'down', 'depressed', 'unhappy','heartbroken','jealous']
+                            'sad', 'bitter', 'down', 'depressed', 'unhappy','heartbroken','jealous', 'fake', 'stupid', 'strange','absurd', 'crazy']
             for negative in negativeFeel:
                 if negative in tokens:
                     count += 1
@@ -178,7 +197,7 @@ class Tweets:
             positivewords = ['joy', ' happy', 'hope', 'kind', 'surprise'
                             , 'excite', ' interest', 'admire',"delight","yummy",
                             'confidenc', 'good', 'satisf', 'pleasant',
-                            'proud', 'amus', 'amazing', 'awesome',"love","passion","great","like","wow","delicious"]
+                            'proud', 'amus', 'amazing', 'awesome',"love","passion","great","like","wow","delicious", "true", "correct", "crazy"]
             for pos in positivewords:
                 if pos in tokens:
                     count += 1

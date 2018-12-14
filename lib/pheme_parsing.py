@@ -66,6 +66,9 @@ class Tweets:
             conversion = 3600
             return abs(self.utc_offset - offset / conversion) if offset else None
 
+        has_question = "?" in twt["text"]
+        has_exclaim = "!" in twt["text"]
+
         features = {
             # Thread metadata
             "is_rumor": lambda obj : 1 if obj['category'] == "rumours" else 0,
@@ -95,6 +98,9 @@ class Tweets:
             "sensitive": lambda obj: 1 if obj.get("possibly_sensitive") else 0,
             "has_place": lambda obj: 1 if obj.get("place") else 0,
             "has_coords": lambda obj: 1 if obj.get("coordinates") else 0,
+            "has_quest": lambda obj: 1 if has_question else 0,
+            "has_exclaim": lambda obj: 1 if has_exclaim else 0,
+            "has_quest_or_exclaim": lambda obj: 1 if (has_question or has_exclaim) else 0,
 
             # User metadata
             "user.tweets_count": lambda obj: obj["user"].get("statuses_count", 0),

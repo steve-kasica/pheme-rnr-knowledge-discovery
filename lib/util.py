@@ -49,7 +49,8 @@ def fetch_X(thread_level_csv_file_address):
     
     """
     X= pd.read_csv(thread_level_csv_file_address,engine="python")
-    X=gw_thrds_without_rumor_tag=X.drop(['event'],axis=1)
+    if 'event' in X.columns:
+        X=gw_thrds_without_rumor_tag=X.drop(['event'],axis=1)
     return X
 
 def fetch_thread(event, is_normalized=True):

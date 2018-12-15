@@ -340,7 +340,7 @@ if __name__ == "__main__":
             #"charliehebdo",
         ]
         dataset = "../raw/pheme-rnr-dataset"
-        for event in os.listdir("%s" % (dataset)):
+        for event in events:
             pheme_to_csv(event)
     else:
         pheme_to_csv(argv[1])

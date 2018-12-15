@@ -7,6 +7,8 @@ from sys import argv
 import string
 import time
 from util import to_unix_tmsp, parse_twitter_datetime
+from multiprocessing import Process
+
 
 #imports for text feature extraction:
 import nltk
@@ -340,7 +342,14 @@ if __name__ == "__main__":
             #"charliehebdo",
         ]
         dataset = "../raw/pheme-rnr-dataset"
+        processes=[]
         for event in events:
-            pheme_to_csv(event)
+            p=Process(target=pheme_to_csv,args=(event,))
+            p.start()
+            processes.append(p)
+            #pheme_to_csv(event)
+        for p in processes:
+            p.join()
+            
     else:
         pheme_to_csv(argv[1])

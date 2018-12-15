@@ -51,7 +51,11 @@ class Tweets:
         self.printable = set(string.printable)
 
         utc_offset = {
-            "germanwings-crash": 1
+            "germanwings-crash": 1,
+            "sydneysiege": 11,
+            "ottowashooting": -4,
+            "ferguson":-5,
+            "charliehebdo":+1,
         }
         self.utc_offset = utc_offset[self.event]
     

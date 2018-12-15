@@ -29,7 +29,7 @@ def pheme_to_csv(event):
     dataset = "../raw/pheme-rnr-dataset"
     thread_number = 0         
     for category in os.listdir("%s/%s" % (dataset, event)):
-        print('category:',category,category=='rumours')
+        print('event:',event,'category:',category,category=='rumours')
         for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
             with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
                 tweet = json.load(f)
@@ -54,7 +54,7 @@ class Tweets:
         utc_offset = {
             "germanwings-crash": 1,
             "sydneysiege": 11,
-            "ottowashooting": -4,
+            "ottawashooting": -4,
             "ferguson":-5,
             "charliehebdo":+1,
         }
@@ -157,8 +157,6 @@ class Tweets:
 
     def tweettext2features(self, tweet_text):   
         """ Extracts some text features from the text of each tweet. The extracted features are as follows:
-        hasqmark: has question mark
-        hasemark: has exclamation mark
         hasperiod: has period
         number_punct: number of punctuation marks
         negativewordcount: the count of the defined negative word counts
@@ -182,7 +180,7 @@ class Tweets:
                "|","{","}","٫",";",">","<","1","2","3","4","5","6","7","8","9","0"]
             hasperiod=sum(c =='.' for c in tweet_text)
             number_punct=sum(c in punctuations for c in tweet_text)
-            return {'hasqmark':hasqmark,'hasemark':hasemark,'hasperiod':hasperiod,'number_punct':number_punct}
+            return {'hasperiod':hasperiod,'number_punct':number_punct}
 
         def negativewordcount(tokens):
             count = 0

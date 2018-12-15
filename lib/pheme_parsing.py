@@ -332,6 +332,13 @@ def agg_event_data(df, limit=0):
 if __name__ == "__main__":
     print("Running %s to parse %s" % (argv[0], argv[1]))
     if(argv[1]=="all"):
+        events=[
+            "germanwings-crash",
+            "sydneysiege",
+            "ottawashooting",
+            "ferguson",
+            #"charliehebdo",
+        ]
         dataset = "../raw/pheme-rnr-dataset"
         for event in os.listdir("%s" % (dataset)):
             pheme_to_csv(event)

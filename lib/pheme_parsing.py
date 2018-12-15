@@ -1,3 +1,4 @@
+# coding: utf-8
 # Load dependencies for this Jupyter Notebook
 import os, json, errno
 import pandas as pd

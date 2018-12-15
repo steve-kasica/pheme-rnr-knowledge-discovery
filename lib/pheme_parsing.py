@@ -180,8 +180,6 @@ class Tweets:
             punctuations= ["\"","(",")","*",",","-","_",".","~","%","^","&","!","#",'@'
                "=","\'","\\","+","/",":","[","]","«","»","،","؛","?",".","…","$",
                "|","{","}","٫",";",">","<","1","2","3","4","5","6","7","8","9","0"]
-            hasqmark =sum(c =='?' for c in tweet_text)
-            hasemark =sum(c =='!' for c in tweet_text)
             hasperiod=sum(c =='.' for c in tweet_text)
             number_punct=sum(c in punctuations for c in tweet_text)
             return {'hasqmark':hasqmark,'hasemark':hasemark,'hasperiod':hasperiod,'number_punct':number_punct}
@@ -228,10 +226,26 @@ class Tweets:
             poscount['Verb']=0
             poscount['Adjective'] = 0
             poscount['Pronoun']=0
+            poscount['FirstPersonPronoun']=0
+            poscount['SecondPersonPronoun']=0
+            poscount['ThirdPersonPronoun']=0
             poscount['Adverb']=0
             Nouns = {'NN','NNS','NNP','NNPS'}
             Verbs={'VB','VBP','VBZ','VBN','VBG','VBD','To'}
+            first_person_pronouns=['I','me','my','mine','we','us','our','ours']
+            second_person_pronouns=['you','your','yours']
+            third_person_pronouns=['he','she','it','him','her','it','his','hers','its','they','them','their','theirs']
+
             word_tokens = nltk.word_tokenize(re.sub(r'([^\s\w]|_)+', '', tweet_text))
+            for word in word_tokens:
+                w_lower=word.lower()
+                if w_lower in first_person_pronouns:
+                    poscount['FirstPersonPronoun']+=1
+                elif w_lower in second_person_pronouns:
+                    poscount['SecondPersonPronoun']+=1
+                elif w_lower in third_person_pronouns:
+                    poscount['ThirdPersonPronoun']+=1
+
             postag = nltk.pos_tag(word_tokens)
             for g1 in postag:
                 if g1[1] in Nouns:
@@ -247,11 +261,11 @@ class Tweets:
             return poscount
         def tweets2tokens(tweet_text):
             tokens = nltk.word_tokenize(re.sub(r'([^\s\w]|_)+','', tweet_text.lower()))
+            url=0
             for token in tokens:
                 if token.startswith( 'http' ):
                     url=1
-                else:
-                    url=0
+
             return tokens,url
 
 
@@ -319,4 +333,9 @@ def agg_event_data(df, limit=0):
 
 if __name__ == "__main__":
     print("Running %s to parse %s" % (argv[0], argv[1]))
-    pheme_to_csv(argv[1])
+    if(argv[1]=="all"):
+        dataset = "../raw/pheme-rnr-dataset"
+        for event in os.listdir("%s" % (dataset)):
+            pheme_to_csv(event)
+    else:
+        pheme_to_csv(argv[1])

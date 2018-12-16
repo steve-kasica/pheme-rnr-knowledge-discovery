@@ -6,39 +6,12 @@ from sys import argv
 import time
 from util import to_unix_tmsp, parse_twitter_datetime
 
-def pheme_to_csv(event):
-    """ Parses json data stored in directories of the PHEME dataset into a CSV file.
-    
-    Params:
-        - event: Name fake news event and directory name in PHEME dataset
-    
-    Return: None
-    """
-    start = time.time()
-    data = Tweets(event)
-    dataset = "raw/pheme-rnr-dataset"
-    thread_number = 0         
-    for category in os.listdir("%s/%s" % (dataset, event)):
-        print('category:',category,category=='rumours')
-        for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
-            with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
-                tweet = json.load(f)
-            data.append(tweet, category, thread, True)
-            thread_number += 1
-            for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
-                with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
-                    tweet = json.load(f)
-                data.append(tweet, category, thread, False)
-    data.export()
-    fn = "data/tweets/%s.csv" % (event)
-    print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
-    return None
-
 class Tweets:
 
-    def __init__(self, event_name):
+    def __init__(self, event_name, out_dir):
         self.event = event_name
         self.data = {}
+        self.out_dir = out_dir
         utc_offset = {
             "germanwings-crash": 1
         }
@@ -102,11 +75,6 @@ class Tweets:
             "has_exclaim": lambda obj: 1 if has_exclaim else 0,
             "has_quest_or_exclaim": lambda obj: 1 if (has_question or has_exclaim) else 0,
 
-            # Tweet data
-            "text": lambda obj: obj["text"],
-            "user.handle": lambda obj: obj["user"].get("screen_name"),
-            "user.name": lambda obj: obj["user"].get("name"),
-
             # User metadata
             "user.tweets_count": lambda obj: obj["user"].get("statuses_count", 0),
             "user.verified": lambda obj: 1 if obj["user"].get("verified") else 0,
@@ -132,9 +100,10 @@ class Tweets:
             self.data.setdefault(col, []).append(features[col](twt))
 
     def export(self):
-        fn = "data/tweets/%s.csv" % (self.event)
+        fn = "%s/%s.csv" % (self.out_dir, self.event)
         df = pd.DataFrame(data=self.data)
         df.to_csv(fn, index=False)
+        return fn
     
     def datestr_to_tmsp(self, datestr):
         """ Converts Twitter's datetime format to Unix timestamp 
@@ -144,6 +113,35 @@ class Tweets:
         Return: Unix timestamp
         """
         return to_unix_tmsp([parse_twitter_datetime(datestr)])[0]
+
+
+def pheme_to_csv(event, Parser=Tweets, output="data/tweets"):
+    """ Parses json data stored in directories of the PHEME dataset into a CSV file.
+    
+    Params:
+        - event: Name fake news event and directory name in PHEME dataset
+    
+    Return: None
+    """
+    start = time.time()
+    data = Parser(event, output)
+    dataset = "raw/pheme-rnr-dataset"
+    thread_number = 0         
+    for category in os.listdir("%s/%s" % (dataset, event)):
+        print('category:',category,category=='rumours')
+        for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
+            with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
+                tweet = json.load(f)
+            data.append(tweet, category, thread, True)
+            thread_number += 1
+            for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
+                with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
+                    tweet = json.load(f)
+                data.append(tweet, category, thread, False)
+    fn = data.export()
+    print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
+    return None
+
 
 def agg_event_data(df, limit=0):
     """ Aggregate tabular tweet data from a PHEME event into aggregated thread-level data

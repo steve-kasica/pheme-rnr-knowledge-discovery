@@ -2,19 +2,24 @@
     to_beeswarm.py
 """
 
-from util import fetch_tweets, to_unix_tmsp
+from pheme_parsing import Tweets, pheme_to_csv
 from sys import argv
-import pandas as pd
 
-def main(event):
-    fn = "data/tweets/%s.csv" % event
-    out = "data/beeswarm/%s.csv" % event
-    twts = pd.read_csv(fn, engine="python")
-    twts = twts[["text", "user.handle", "user.name", "is_rumor", "created"]]
-    twts.to_csv(out, index=False)
-    return out
+class TweetData(Tweets):
+
+    def append(self, twt, cat, thrd, is_src):
+
+        features = {
+            "text": lambda obj: obj["text"],
+            "is_rumor": lambda obj : 1 if cat == "rumours" else 0,
+            "user.handle": lambda obj: obj["user"].get("screen_name"),
+            "created": lambda obj : self.datestr_to_tmsp(obj.get("created_at")),
+        }
+
+        for col in features:
+            self.data.setdefault(col, []).append(features[col](twt))
 
 if __name__ == "__main__":
-    filename = main(argv[1])
-    print("Successfully output %s" % filename)
-
+    event = argv[1]
+    output_dir = 'data/beeswarm'
+    pheme_to_csv(event, TweetData, output_dir)

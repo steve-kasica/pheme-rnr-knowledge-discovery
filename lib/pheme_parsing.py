@@ -18,38 +18,13 @@ import re
 from nltk.corpus import stopwords as stp
 from textblob import TextBlob
 
-def pheme_to_csv(event, Parser=Tweets, output="data/tweets"):
-    """ Parses json data stored in directories of the PHEME dataset into a CSV file.
-    
-    Params:
-        - event: Name fake news event and directory name in PHEME dataset
-    
-    Return: None
-    """
-    start = time.time()
-    data = Parser(event, output)
-    dataset = "../raw/pheme-rnr-dataset"
-    thread_number = 0         
-    for category in os.listdir("%s/%s" % (dataset, event)):
-        print('event:',event,'category:',category,category=='rumours')
-        for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
-            with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
-                tweet = json.load(f)
-            data.append(tweet, category, thread, True)
-            thread_number += 1
-            for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
-                with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
-                    tweet = json.load(f)
-                data.append(tweet, category, thread, False)
-    fn = data.export()
-    print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
-    return None
 
 class Tweets:
 
-    def __init__(self, event_name):
+    def __init__(self, event_name, output_dir="data/tweets"):
         self.event = event_name
         self.data = {}
+        self.output_dir = output_dir
         self.printable = set(string.printable)
 
         utc_offset = {
@@ -287,9 +262,10 @@ class Tweets:
         return features
 
     def export(self):
-        fn = "../data/tweets/%s.csv" % (self.event)
+        fn = "%s/%s.csv" % (self.output_dir, self.event)
         df = pd.DataFrame(data=self.data)
         df.to_csv(fn, index=False)
+        return fn
     
     def datestr_to_tmsp(self, datestr):
         """ Converts Twitter's datetime format to Unix timestamp 
@@ -299,6 +275,33 @@ class Tweets:
         Return: Unix timestamp
         """
         return to_unix_tmsp([parse_twitter_datetime(datestr)])[0]
+
+def pheme_to_csv(event, Parser=Tweets, output="data/tweets"):
+    """ Parses json data stored in directories of the PHEME dataset into a CSV file.
+    
+    Params:
+        - event: Name fake news event and directory name in PHEME dataset
+    
+    Return: None
+    """
+    start = time.time()
+    data = Parser(event, output_dir=output)
+    dataset = "raw/pheme-rnr-dataset"
+    thread_number = 0         
+    for category in os.listdir("%s/%s" % (dataset, event)):
+        print('event:',event,'category:',category,category=='rumours')
+        for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
+            with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
+                tweet = json.load(f)
+            data.append(tweet, category, thread, True)
+            thread_number += 1
+            for reaction in os.listdir("%s/%s/%s/%s/reactions" % (dataset, event, category, thread)):
+                with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
+                    tweet = json.load(f)
+                data.append(tweet, category, thread, False)
+    fn = data.export()
+    print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
+    return None
 
 def agg_event_data(df, limit=0):
     """ Aggregate tabular tweet data from a PHEME event into aggregated thread-level data

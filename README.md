@@ -1,4 +1,4 @@
-# Knowledge Discovery for Interpretability and Insight in Network Approaches to Automatic Fake News Dection
+# Knowledge Discovery for Interpretability and Insight in Network Approaches to Automatic Fake News Detection
 
 Steve Kasica and Ali Mohammad Mehr
 

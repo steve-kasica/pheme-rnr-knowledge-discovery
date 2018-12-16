@@ -15,7 +15,7 @@ import re
 from nltk.corpus import stopwords as stp
 from textblob import TextBlob
 
-def pheme_to_csv(event):
+def pheme_to_csv(event, Parser=Tweets, output="data/tweets"):
     """ Parses json data stored in directories of the PHEME dataset into a CSV file.
     
     Params:
@@ -24,7 +24,7 @@ def pheme_to_csv(event):
     Return: None
     """
     start = time.time()
-    data = Tweets(event)
+    data = Parser(event, output)
     dataset = "../raw/pheme-rnr-dataset"
     thread_number = 0         
     for category in os.listdir("%s/%s" % (dataset, event)):
@@ -38,8 +38,7 @@ def pheme_to_csv(event):
                 with open("%s/%s/%s/%s/reactions/%s" % (dataset, event, category, thread, reaction)) as f:
                     tweet = json.load(f)
                 data.append(tweet, category, thread, False)
-    data.export()
-    fn = "../data/tweets/%s.csv" % (event)
+    fn = data.export()
     print("%s was generated in %s minutes" % (fn, (time.time() - start) / 60))
     return None
 

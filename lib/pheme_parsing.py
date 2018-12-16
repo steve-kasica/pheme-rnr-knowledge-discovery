@@ -1,3 +1,4 @@
+# coding: utf-8
 # Load dependencies for this Jupyter Notebook
 import os, json, errno
 import pandas as pd
@@ -6,6 +7,8 @@ from sys import argv
 import string
 import time
 from util import to_unix_tmsp, parse_twitter_datetime
+from multiprocessing import Process
+
 
 #imports for text feature extraction:
 import nltk
@@ -28,7 +31,7 @@ def pheme_to_csv(event, Parser=Tweets, output="data/tweets"):
     dataset = "../raw/pheme-rnr-dataset"
     thread_number = 0         
     for category in os.listdir("%s/%s" % (dataset, event)):
-        print('category:',category,category=='rumours')
+        print('event:',event,'category:',category,category=='rumours')
         for thread in os.listdir("%s/%s/%s" % (dataset, event, category)):
             with open("%s/%s/%s/%s/source-tweet/%s.json" % (dataset, event, category, thread, thread)) as f:
                 tweet = json.load(f)
@@ -50,7 +53,11 @@ class Tweets:
         self.printable = set(string.printable)
 
         utc_offset = {
-            "germanwings-crash": 1
+            "germanwings-crash": 1,
+            "sydneysiege": 11,
+            "ottawashooting": -4,
+            "ferguson":-5,
+            "charliehebdo":+1,
         }
         self.utc_offset = utc_offset[self.event]
     
@@ -151,8 +158,6 @@ class Tweets:
 
     def tweettext2features(self, tweet_text):   
         """ Extracts some text features from the text of each tweet. The extracted features are as follows:
-        hasqmark: has question mark
-        hasemark: has exclamation mark
         hasperiod: has period
         number_punct: number of punctuation marks
         negativewordcount: the count of the defined negative word counts
@@ -174,11 +179,9 @@ class Tweets:
             punctuations= ["\"","(",")","*",",","-","_",".","~","%","^","&","!","#",'@'
                "=","\'","\\","+","/",":","[","]","«","»","،","؛","?",".","…","$",
                "|","{","}","٫",";",">","<","1","2","3","4","5","6","7","8","9","0"]
-            hasqmark =sum(c =='?' for c in tweet_text)
-            hasemark =sum(c =='!' for c in tweet_text)
             hasperiod=sum(c =='.' for c in tweet_text)
             number_punct=sum(c in punctuations for c in tweet_text)
-            return {'hasqmark':hasqmark,'hasemark':hasemark,'hasperiod':hasperiod,'number_punct':number_punct}
+            return {'hasperiod':hasperiod,'number_punct':number_punct}
 
         def negativewordcount(tokens):
             count = 0
@@ -222,10 +225,26 @@ class Tweets:
             poscount['Verb']=0
             poscount['Adjective'] = 0
             poscount['Pronoun']=0
+            poscount['FirstPersonPronoun']=0
+            poscount['SecondPersonPronoun']=0
+            poscount['ThirdPersonPronoun']=0
             poscount['Adverb']=0
             Nouns = {'NN','NNS','NNP','NNPS'}
             Verbs={'VB','VBP','VBZ','VBN','VBG','VBD','To'}
+            first_person_pronouns=['I','me','my','mine','we','us','our','ours']
+            second_person_pronouns=['you','your','yours']
+            third_person_pronouns=['he','she','it','him','her','it','his','hers','its','they','them','their','theirs']
+
             word_tokens = nltk.word_tokenize(re.sub(r'([^\s\w]|_)+', '', tweet_text))
+            for word in word_tokens:
+                w_lower=word.lower()
+                if w_lower in first_person_pronouns:
+                    poscount['FirstPersonPronoun']+=1
+                elif w_lower in second_person_pronouns:
+                    poscount['SecondPersonPronoun']+=1
+                elif w_lower in third_person_pronouns:
+                    poscount['ThirdPersonPronoun']+=1
+
             postag = nltk.pos_tag(word_tokens)
             for g1 in postag:
                 if g1[1] in Nouns:
@@ -241,11 +260,11 @@ class Tweets:
             return poscount
         def tweets2tokens(tweet_text):
             tokens = nltk.word_tokenize(re.sub(r'([^\s\w]|_)+','', tweet_text.lower()))
+            url=0
             for token in tokens:
                 if token.startswith( 'http' ):
                     url=1
-                else:
-                    url=0
+
             return tokens,url
 
 
@@ -313,4 +332,23 @@ def agg_event_data(df, limit=0):
 
 if __name__ == "__main__":
     print("Running %s to parse %s" % (argv[0], argv[1]))
-    pheme_to_csv(argv[1])
+    if(argv[1]=="all"):
+        events=[
+            "germanwings-crash",
+            "sydneysiege",
+            "ottawashooting",
+            "ferguson",
+            #"charliehebdo",
+        ]
+        dataset = "../raw/pheme-rnr-dataset"
+        processes=[]
+        for event in events:
+            p=Process(target=pheme_to_csv,args=(event,))
+            p.start()
+            processes.append(p)
+            #pheme_to_csv(event)
+        for p in processes:
+            p.join()
+            
+    else:
+        pheme_to_csv(argv[1])

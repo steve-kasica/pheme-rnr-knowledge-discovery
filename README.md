@@ -34,4 +34,4 @@ In lieu of copying everything in our notebooks into one master presentation, we 
 
 1. intro.slides.html
 2. data_cleaning.slides.html
-   exploratory_data_analysis.slides.html
+3. exploratory_data_analysis.slides.html

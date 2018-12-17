@@ -1,6 +1,6 @@
 # Knowledge Discovery for Interpretability and Insight in Network Approaches to Automatic Fake News Detection
 
-Steve Kasica and Ali Mohammad Mehr
+Steve Kasica and [Ali Mohammad Mehr](https://github.com/alimm1374)
 
 Machine learning classifiers that utilize network-based features for fake news detection have resulted in surprisingly low verification/test error rates. By fake new detection, we mean a supervised-learning approaching to classifying conversational threads as being binary rumor or non-rumor. Given the disproportionate number of fake news article and the resources available to determine their veracity, automated approaches to classification are one compelling approach to solving this problem. Instead of focusing on improving accuracy, our project aims to interpret and understand what features are most important in many machine-learning classifiers and why are some features better than others. Our contributions include: detailed code on engineering 58 features available in the Twitter API from the PHEME Rumor Dataset, several visualization idioms for interpreting whether or not features will be effective in fake news classification, and accuracy results from many common machine-learning classification models.
 

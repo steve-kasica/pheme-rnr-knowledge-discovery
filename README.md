@@ -15,7 +15,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 
 ## Project Presentation
 
-For our project presentation, we're using [Jupyter Notebook's slides features]https://medium.com/@mjspeck/presenting-code-using-jupyter-notebook-slides-a8a3c3b59d67()
+For our project presentation, we're using [Jupyter Notebook's slides features](https://medium.com/@mjspeck/presenting-code-using-jupyter-notebook-slides-a8a3c3b59d67)
 
 ### Converting Notebooks to Slides
 
